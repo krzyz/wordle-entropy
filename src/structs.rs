@@ -1,6 +1,9 @@
-use core::fmt;
-use std::iter;
 use colored::Colorize;
+use core::fmt;
+use std::{
+    collections::{HashMap, HashSet},
+    iter,
+};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Hint {
@@ -9,14 +12,26 @@ pub enum Hint {
     Right,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct Hints<const N: usize> {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct HintsN<const N: usize> {
     pub word: [Hint; N],
+}
+
+impl<const N: usize> HintsN<N> {
+    pub fn correct() -> HintsN<N> {
+        HintsN {
+            word: iter::repeat(Hint::Right)
+                .take(N)
+                .collect::<Vec<_>>()
+                .try_into()
+                .unwrap(),
+        }
+    }
 }
 /*
 impl<const N: usize> Hints<N> {
     pub fn none() -> Hints<N> {
-        Hints {
+        HintsN {
             word: iter::repeat(Hint::Wrong)
                 .take(N)
                 .collect::<Vec<_>>()
@@ -27,7 +42,7 @@ impl<const N: usize> Hints<N> {
 }
 */
 
-impl<const N: usize> fmt::Display for Hints<N> {
+impl<const N: usize> fmt::Display for HintsN<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for &hint in self.word.iter() {
             let square = match hint {
@@ -38,11 +53,11 @@ impl<const N: usize> fmt::Display for Hints<N> {
 
             write!(f, "{}", square).unwrap();
         }
-        writeln!(f, "")
+        Ok(())
     }
 }
 
-impl<const N: usize> TryFrom<Vec<Hint>> for Hints<N> {
+impl<const N: usize> TryFrom<Vec<Hint>> for HintsN<N> {
     type Error = &'static str;
 
     fn try_from(value: Vec<Hint>) -> Result<Self, Self::Error> {
@@ -56,7 +71,7 @@ impl<const N: usize> TryFrom<Vec<Hint>> for Hints<N> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct WordN<const N: usize> {
     pub word: [char; N],
 }
@@ -78,23 +93,40 @@ impl<const N: usize> WordN<N> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+pub enum PartialChar {
+    None,
+    Excluded(HashSet<char>),
+    Some(char),
+}
+
+#[derive(Debug, Clone)]
 pub struct PartialWord<const N: usize> {
-    pub word: [Option<char>; N],
+    pub word: [PartialChar; N],
+}
+
+impl<const N: usize> Default for PartialWord<N> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<const N: usize> PartialWord<N> {
     pub fn new() -> Self {
         Self {
-            word: iter::repeat(None).take(N).collect::<Vec<_>>().try_into().unwrap(),
+            word: iter::repeat(PartialChar::None)
+                .take(N)
+                .collect::<Vec<_>>()
+                .try_into()
+                .unwrap(),
         }
     }
 }
 
-impl<const N: usize> TryFrom<Vec<Option<char>>> for PartialWord<N> {
+impl<const N: usize> TryFrom<Vec<PartialChar>> for PartialWord<N> {
     type Error = &'static str;
 
-    fn try_from(value: Vec<Option<char>>) -> Result<Self, Self::Error> {
+    fn try_from(value: Vec<PartialChar>) -> Result<Self, Self::Error> {
         if value.len() != N {
             Err("Wrong size!")
         } else {
@@ -105,19 +137,15 @@ impl<const N: usize> TryFrom<Vec<Option<char>>> for PartialWord<N> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct KnowledgeN<const N: usize> {
-    pub known: PartialWord<N>,
-    pub out_of_place: Vec<char>,
-    pub ruled_out: Vec<char>,
+    pub known: HashMap<char, u8>,
+    pub ruled_out: HashSet<char>,
+    pub placed: PartialWord<N>,
 }
 
 impl<const N: usize> KnowledgeN<N> {
     pub fn none() -> Self {
-        Self {
-            known: PartialWord::<N>::new(),
-            out_of_place: vec![],
-            ruled_out: vec![],
-        }
+        Self::default()
     }
 }
