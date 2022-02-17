@@ -93,7 +93,7 @@ impl<const N: usize> WordN<N> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PartialChar {
     None,
     Excluded(HashSet<char>),

@@ -3,9 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crate::structs::{Hint, HintsN, KnowledgeN, PartialChar, WordN};
 use itertools::izip;
 
-pub fn get_hints<const N: usize>(
-    guess: &WordN<N>,
-    correct: &WordN<N>) -> HintsN<N> {
+pub fn get_hints<const N: usize>(guess: &WordN<N>, correct: &WordN<N>) -> HintsN<N> {
     let mut hints: HintsN<N> = guess
         .word
         .into_iter()
@@ -23,10 +21,12 @@ pub fn get_hints<const N: usize>(
         .map(|(c, _)| c)
         .collect::<Vec<_>>();
 
-    for (i, g) in guess.word.iter().enumerate() {
-        if let Some(index) = left.iter().position(|&l| g == l) {
-            hints.word[i] = Hint::OutOfPlace;
-            left.remove(index);
+    for (g, h) in guess.word.iter().zip(hints.word.iter_mut()) {
+        if *h != Hint::Right {
+            if let Some(index) = left.iter().position(|&l| g == l) {
+                *h = Hint::OutOfPlace;
+                left.remove(index);
+            }
         }
     }
     hints
@@ -37,14 +37,6 @@ pub fn update_knowledge<const N: usize>(
     hints: &HintsN<N>,
     knowledge: KnowledgeN<N>,
 ) -> KnowledgeN<N> {
-    let ruled_out_now = guess
-        .word
-        .into_iter()
-        .zip(hints.word.into_iter())
-        .filter(|&(_, h)| h == Hint::Wrong)
-        .map(|(c, _)| c)
-        .collect::<Vec<_>>();
-
     let known_now = {
         let mut known_now: HashMap<_, u8> = HashMap::new();
         for (g, h) in izip!(guess.word, hints.word) {
@@ -58,17 +50,23 @@ pub fn update_knowledge<const N: usize>(
         known_now
     };
 
+    let ruled_out_now = guess
+        .word
+        .into_iter()
+        .zip(hints.word.into_iter())
+        .filter(|&(c, h)| h == Hint::Wrong && !known_now.contains_key(&c))
+        .map(|(c, _)| c)
+        .collect::<Vec<_>>();
+
     let placed = izip!(knowledge.placed.word, &hints.word, &guess.word)
         .map(|(k, &h, &g)| match (k, h) {
             (PartialChar::Some(k), _) => PartialChar::Some(k),
             (_, Hint::Right) => PartialChar::Some(g),
-            (PartialChar::Excluded(mut excluded), Hint::OutOfPlace) => {
+            (PartialChar::Excluded(mut excluded), _) => {
                 excluded.insert(g);
                 PartialChar::Excluded(excluded)
             }
-            (PartialChar::Excluded(excluded), Hint::Wrong) => PartialChar::Excluded(excluded),
-            (PartialChar::None, Hint::OutOfPlace) => PartialChar::Excluded(HashSet::from([g])),
-            (_, _) => PartialChar::None,
+            (PartialChar::None, _) => PartialChar::Excluded(HashSet::from([g])),
         })
         .collect::<Vec<_>>()
         .try_into()
@@ -113,21 +111,17 @@ pub fn check<const N: usize>(word: &WordN<N>, knowledge: &KnowledgeN<N>) -> bool
     let mut known_left = knowledge.known.clone();
 
     for (w, p) in izip!(word.word, &knowledge.placed.word) {
-        if knowledge.ruled_out.contains(&w) {
-            return false
+        if knowledge.ruled_out.contains(&w) && *p != PartialChar::Some(w) {
+            return false;
         }
         match p {
-            PartialChar::Some(c) if *c != w => {
-                return false
-            }
-            PartialChar::Excluded(excluded) if excluded.contains(&w) => {
-                return false
-            }
+            PartialChar::Some(c) if *c != w => return false,
+            PartialChar::Excluded(excluded) if excluded.contains(&w) => return false,
             _ => (),
         }
 
         if let Some(count) = known_left.get_mut(&w) {
-            *count -= 1;
+            *count = count.saturating_sub(1);
         }
     }
 
@@ -140,6 +134,12 @@ pub fn check<const N: usize>(word: &WordN<N>, knowledge: &KnowledgeN<N>) -> bool
     return true;
 }
 
-pub fn get_answers<const N: usize>(words: Vec<WordN<N>>, knowledge: &KnowledgeN<N>) -> Vec<WordN<N>> {
-    words.into_iter().filter(|word| check(word, knowledge)).collect()
+pub fn get_answers<const N: usize>(
+    words: Vec<WordN<N>>,
+    knowledge: &KnowledgeN<N>,
+) -> Vec<WordN<N>> {
+    words
+        .into_iter()
+        .filter(|word| check(word, knowledge))
+        .collect()
 }
