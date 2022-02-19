@@ -36,5 +36,5 @@ pub fn print_example() {
 fn main() {
     let words = data::load_words::<_, WORDS_LENGTH>(WORDS_PATH).unwrap();
 
-    solve_random(&words, words.len());
+    solve_random(&words, 500);
 }

@@ -19,15 +19,17 @@ fn solve<const N: usize>(
     words: &Vec<WordN<N>>,
     correct: &WordN<N>,
     print: bool,
-) -> (Vec<WordN<N>>, Vec<HintsN<N>>, Vec<f32>) {
+) -> (Vec<WordN<N>>, Vec<HintsN<N>>, Vec<f32>, Vec<f32>) {
     let mut answers = words.clone();
     let mut knowledge = KnowledgeN::<N>::default();
     let mut total_entropies = Vec::<f32>::new();
+    let mut uncertainties= Vec::<f32>::new();
     let mut guesses = vec![];
     let mut all_hints = vec![];
     let mut uncertainty = (words.len() as f32).log2();
 
     for i in 0.. {
+        uncertainties.push(uncertainty);
         if answers.len() == 1 {
             total_entropies.push(total_entropies.last().copied().unwrap_or_default());
             guesses.push(answers.first().unwrap().clone());
@@ -94,7 +96,7 @@ fn solve<const N: usize>(
         }
     }
 
-    (guesses, all_hints, total_entropies)
+    (guesses, all_hints, total_entropies, uncertainties)
 }
 
 pub fn solve_random<const N: usize>(words: &Vec<WordN<N>>, n: usize) {
@@ -106,7 +108,7 @@ pub fn solve_random<const N: usize>(words: &Vec<WordN<N>>, n: usize) {
 
     for correct in correct_words {
         println!("correct: {correct}");
-        let (guesses, hints, entropies) = solve(&initial_entropies, words, correct, false);
+        let (guesses, hints, entropies, uncertainties) = solve(&initial_entropies, words, correct, false);
 
         print_vec(&guesses);
         print_vec(&hints);
