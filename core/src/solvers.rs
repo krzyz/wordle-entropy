@@ -10,8 +10,15 @@ use crate::{
     util::print_vec,
 };
 
+/*
 pub fn expected_turns(entropy_left: f32) -> f32 {
     2. / 9. * entropy_left + 1.
+}
+*/
+
+pub fn expected_turns(x: f32, r: f32, a: f32, b: f32) -> f32 {
+    let x = x + 1.;
+    b + a * x.powf(r) * x.ln()
 }
 
 fn solve<const N: usize>(
@@ -52,7 +59,7 @@ fn solve<const N: usize>(
                 };
 
                 // the less the better
-                let left_diff = expected_turns(uncertainty - entropy) * (1. - prob);
+                let left_diff = expected_turns(uncertainty - entropy, 0., 1.6369421, -0.029045254) * (1. - prob);
 
                 (g, (entropy, left_diff, guess_hints))
             })
@@ -99,7 +106,7 @@ fn solve<const N: usize>(
     (guesses, all_hints, total_entropies, uncertainties)
 }
 
-pub fn solve_random<const N: usize>(words: &Vec<WordN<N>>, n: usize) {
+pub fn solve_random<const N: usize>(words: &Vec<WordN<N>>, n: usize) -> Vec<(f32, i32)> {
     let correct_words = words.iter().choose_multiple(&mut rand::thread_rng(), n);
 
     let initial_entropies = calculate_entropies(words, words);
@@ -117,7 +124,7 @@ pub fn solve_random<const N: usize>(words: &Vec<WordN<N>>, n: usize) {
         println!();
 
         turns.push(guesses.len() as f32);
-        let unc_points = uncertainties.iter().enumerate().map(|(i, unc)| (guesses.len() - i, *unc)).collect::<Vec<_>>();
+        let unc_points = uncertainties.iter().enumerate().map(|(i, unc)| (*unc, (guesses.len() - i) as i32)).collect::<Vec<_>>();
         unc_data.extend(unc_points);
     }
 
@@ -125,5 +132,5 @@ pub fn solve_random<const N: usize>(words: &Vec<WordN<N>>, n: usize) {
 
     println!("turns: {turns}");
     println!("mean: {}", turns.mean().unwrap());
-    println!("unc: {unc_data:?}");
+    unc_data 
 }

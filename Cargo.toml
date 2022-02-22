@@ -1,6 +1,7 @@
 [workspace]
 
 members = [
+    "bin",
     "core",
     "web",
 ]
