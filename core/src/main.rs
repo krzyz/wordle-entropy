@@ -1,14 +1,8 @@
-mod algo;
-mod data;
-mod entropy;
-mod solvers;
-mod structs;
-mod util;
-
-use solvers::solve_random;
-use structs::WordN;
-
-use crate::structs::KnowledgeN;
+use we_core::algo;
+use we_core::data;
+use we_core::solvers::solve_random;
+use we_core::structs::{KnowledgeN, WordN};
+use wordle_entropy_core as we_core;
 
 const WORDS_PATH: &str = "/home/krzyz/projects/data/words_polish.txt";
 const WORDS_LENGTH: usize = 5;
@@ -36,5 +30,5 @@ pub fn print_example() {
 fn main() {
     let words = data::load_words::<_, WORDS_LENGTH>(WORDS_PATH).unwrap();
 
-    solve_random(&words, 500);
+    solve_random(&words, 12);
 }

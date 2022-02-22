@@ -105,6 +105,7 @@ pub fn solve_random<const N: usize>(words: &Vec<WordN<N>>, n: usize) {
     let initial_entropies = calculate_entropies(words, words);
 
     let mut turns = vec![];
+    let mut unc_data = vec![];
 
     for correct in correct_words {
         println!("correct: {correct}");
@@ -116,10 +117,13 @@ pub fn solve_random<const N: usize>(words: &Vec<WordN<N>>, n: usize) {
         println!();
 
         turns.push(guesses.len() as f32);
+        let unc_points = uncertainties.iter().enumerate().map(|(i, unc)| (guesses.len() - i, *unc)).collect::<Vec<_>>();
+        unc_data.extend(unc_points);
     }
 
     let turns = Array::from(turns);
 
     println!("turns: {turns}");
     println!("mean: {}", turns.mean().unwrap());
+    println!("unc: {unc_data:?}");
 }
