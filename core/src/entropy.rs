@@ -1,5 +1,6 @@
 use indexmap::IndexMap;
 use ndarray::Array1;
+#[cfg(feature = "parallel")]
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
@@ -34,11 +35,20 @@ pub fn entropy(arr: Array1<f32>) -> f32 {
         .map(|x| x as f32)
         .collect::<Array1<f32>>();
 
+    #[cfg(feature = "parallel")]
     let arr_log = {
         let mut arr_log = arr.clone();
         arr_log.par_mapv_inplace(|x| (x).log2());
         arr_log
     };
+
+    #[cfg(not(feature = "parallel"))]
+    let arr_log = {
+        let mut arr_log = arr.clone();
+        arr_log.mapv_inplace(|x| (x).log2());
+        arr_log
+    };
+
 
     -1. * (arr * arr_log).sum()
 }
@@ -49,8 +59,13 @@ pub fn calculate_entropies<'a, 'b, const N: usize>(
 ) -> IndexMap<&'a WordN<N>, (f32, IndexMap<HintsN<N>, f32>)> {
     let n = possible_answers.len() as f32;
 
-    let entropies = all_words
-        .par_iter()
+    #[cfg(feature = "parallel")]
+    let all_words_iter = all_words.par_iter();
+
+    #[cfg(not(feature = "parallel"))]
+    let all_words_iter = all_words.iter();
+
+    let entropies = all_words_iter
         .map(|guess| {
             let mut guess_hints = IndexMap::<_, f32>::new();
             for correct in possible_answers.iter() {

@@ -9,6 +9,12 @@ edition = "2021"
 colored = "2.0.0"
 indexmap = "1.8.0"
 itertools = "0.10.3"
-ndarray = {version = "0.15.4", features = ["rayon"]}
+ndarray = {version = "0.15.4"}
+getrandom = {version = "*", features = ["js"]}
 rand = "0.8.5"
-rayon = "1.5.1"
+rayon = {version = "1.5.1", optional = true}
+serde = "1.0.136"
+
+[features]
+default = ["parallel"]
+parallel = ["rayon", "ndarray/rayon"]

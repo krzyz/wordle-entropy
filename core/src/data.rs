@@ -13,3 +13,10 @@ where
         .map(|l| l.map(|l| WordN::<N>::new(&l)))
         .collect()
 }
+
+pub fn parse_words<'a, I, const N: usize>(lines: I) -> Vec<WordN<N>>
+where I: Iterator<Item = &'a str> {
+    lines
+        .map(|l| WordN::<N>::new(&l))
+        .collect()
+}
