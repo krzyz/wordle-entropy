@@ -56,7 +56,7 @@ pub fn entropy(arr: Array1<f32>) -> f32 {
 pub fn calculate_entropies<'a, 'b, const N: usize>(
     all_words: &'a Vec<WordN<N>>,
     possible_answers: &'b Vec<WordN<N>>,
-) -> IndexMap<&'a WordN<N>, (f32, IndexMap<HintsN<N>, f32>)> {
+) -> IndexMap<WordN<N>, (f32, IndexMap<HintsN<N>, f32>)> {
     let n = possible_answers.len() as f32;
 
     #[cfg(feature = "parallel")]
@@ -78,7 +78,7 @@ pub fn calculate_entropies<'a, 'b, const N: usize>(
             );
             let entropy = entropy(probs);
 
-            (guess, (entropy, guess_hints))
+            (guess.clone(), (entropy, guess_hints))
         })
         .collect::<Vec<_>>()
         .into_iter()

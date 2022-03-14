@@ -1,7 +1,7 @@
 use indexmap::IndexMap;
 use ndarray::Array;
 use rand::prelude::IteratorRandom;
-use std::cmp::Ordering::Equal;
+use std::{cmp::Ordering::Equal, time::Instant};
 
 use crate::{
     algo::{get_answers, get_hints_and_update},
@@ -22,7 +22,7 @@ pub fn expected_turns(x: f32, r: f32, a: f32, b: f32) -> f32 {
 }
 
 fn solve<const N: usize>(
-    initial_entropies: &IndexMap<&WordN<N>, (f32, IndexMap<HintsN<N>, f32>)>,
+    initial_entropies: &IndexMap<WordN<N>, (f32, IndexMap<HintsN<N>, f32>)>,
     words: &Vec<WordN<N>>,
     correct: &WordN<N>,
     print: bool,
@@ -52,7 +52,7 @@ fn solve<const N: usize>(
         let mut scores = entropies
             .into_iter()
             .map(|(g, (entropy, guess_hints))| {
-                let prob = if answers.contains(g) {
+                let prob = if answers.contains(&g) {
                     1. / (answers.len() as f32)
                 } else {
                     0.
@@ -109,7 +109,10 @@ fn solve<const N: usize>(
 pub fn solve_random<const N: usize>(words: &Vec<WordN<N>>, n: usize) -> Vec<(f32, i32)> {
     let correct_words = words.iter().choose_multiple(&mut rand::thread_rng(), n);
 
+    let start = Instant::now();
     let initial_entropies = calculate_entropies(words, words);
+    let duration = start.elapsed();
+    println!("Initial entropies calculation took: {}ms", duration.as_millis());
 
     let mut turns = vec![];
     let mut unc_data = vec![];
