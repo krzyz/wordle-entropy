@@ -1,13 +1,24 @@
-use gloo_file::callbacks::{read_as_text};
+use std::rc::Rc;
+
+use gloo_file::callbacks::read_as_text;
 use web_sys::{FocusEvent, HtmlInputElement};
-use wordle_entropy_core::{data::parse_words, solvers::solve_random};
+use wordle_entropy_core::{data::parse_words};
 use yew::{
     events::Event, function_component, html, use_mut_ref, use_node_ref, use_state, Callback,
     TargetCast,
 };
+use gloo_worker::{Bridged, Worker};
+
+use crate::worker::WordleWorker;
+
 
 #[function_component(App)]
 pub fn app() -> Html {
+    let cb = move |res: <WordleWorker as Worker>::Output| {
+        log::info!("{res:#?}");
+    };
+
+    let worker = use_mut_ref(|| WordleWorker::bridge(Rc::new(cb)));
     let words = use_state(|| vec![]);
     let random_words_num = use_mut_ref(|| 10);
     let file_input_node_ref = use_node_ref();
@@ -16,9 +27,10 @@ pub fn app() -> Html {
     let onclick = {
         let random_words_num = random_words_num.clone();
         let words = words.clone();
+        let worker = worker.clone();
         Callback::from(move |_| {
-            let unc_data = solve_random(&words, *random_words_num.borrow());
-            log::info!("{unc_data:#?}");
+            log::info!("call worker");
+            worker.borrow_mut().send(((*words).clone(), *random_words_num.borrow()));
         })
     };
 

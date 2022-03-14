@@ -4,5 +4,7 @@ members = [
     "bin",
     "core",
     "web",
-    "web2",
 ]
+
+[patch.crates-io]
+gloo-console = { git = "https://github.com/krzyz/gloo" }

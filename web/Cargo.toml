@@ -2,20 +2,33 @@
 name = "wordle-entropy-web"
 version = "0.1.0"
 edition = "2021"
-description = "Template for starting a Yew project using Trunk"
-readme = "README.md"
-repository = "https://github.com/yewstack/yew-trunk-minimal-template"
-license = "MIT OR Apache-2.0"
-keywords = ["yew", "trunk"]
-categories = ["gui", "wasm", "web-programming"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = ["cdylib"]
+
 [dependencies]
-yew = "0.19"
-wordle-entropy-core = { path = "../core" }
-web-sys = {version = "0.3.56", features = ["Navigator", "Window"]}
-gloo-file = "0.2.1"
-wasm-logger = "0.2.0"
+
+yew = "0.19.3"
+wordle-entropy-core = { path = "../core", default-features = false }
+strum = "0.24.0"
+strum_macros = "0.24.0"
+wee_alloc = { version = "0.4.4", optional = true }
 log = "0.4.14"
-wasm-bindgen-rayon = {version = "1.0.3", features = ["no-bundler"]}
 wasm-bindgen-futures = "0.4.29"
+gloo-worker = { git = "https://github.com/krzyz/gloo" }
+gloo-timers = { git = "https://github.com/krzyz/gloo" }
+gloo-file = { git = "https://github.com/krzyz/gloo" }
+js-sys = "0.3"
+once_cell = "1.8"
+wasm-bindgen = "0.2.79"
+wasm-bindgen-rayon = { version = "1.0", features = ["no-bundler"] }
+wasm-logger = "0.2"
+
+
+[dependencies.web-sys]
+version = "0.3.56"
+features = [
+  'KeyboardEvent',
+  'Navigator',
+  'Window'
+]
