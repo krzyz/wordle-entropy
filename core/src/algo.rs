@@ -4,31 +4,30 @@ use crate::structs::{Hint, HintsN, KnowledgeN, PartialChar, WordN};
 use itertools::izip;
 
 pub fn get_hints<const N: usize>(guess: &WordN<N>, correct: &WordN<N>) -> HintsN<N> {
-    let mut hints: HintsN<N> = guess
+    let mut hints = HintsN::<N>::new();
+    let mut left = Vec::with_capacity(N);
+    for (i, (g, c)) in guess
         .word
         .into_iter()
         .zip(correct.word.into_iter())
-        .map(|(g, c)| if g == c { Hint::Correct } else { Hint::Wrong })
-        .collect::<Vec<_>>()
-        .try_into()
-        .unwrap();
+        .enumerate()
+    {
+        if g == c {
+            hints.word[i] = Hint::Correct
+        } else {
+            left.push(c);
+        }
+    }
 
-    let mut left = correct
-        .word
-        .iter()
-        .zip(hints.word.into_iter())
-        .filter(|&(_, h)| h == Hint::Wrong)
-        .map(|(c, _)| c)
-        .collect::<Vec<_>>();
-
-    for (g, h) in guess.word.iter().zip(hints.word.iter_mut()) {
-        if *h != Hint::Correct {
-            if let Some(index) = left.iter().position(|&l| g == l) {
-                *h = Hint::OutOfPlace;
-                left.remove(index);
+    for l in left {
+        for i in 0..N {
+            if hints.word[i] == Hint::Wrong && l == guess.word[i] {
+                hints.word[i] = Hint::OutOfPlace;
+                break
             }
         }
     }
+
     hints
 }
 
@@ -144,7 +143,6 @@ pub fn get_answers<const N: usize>(
         .collect()
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -164,6 +162,6 @@ mod tests {
     #[case("cacbb", "abcba", "WOCCO")]
     fn hints_ok(#[case] guess: &str, #[case] answer: &str, #[case] expected: &str) {
         let hints = get_hints(&Word::new(guess), &Word::new(answer));
-        assert_eq!(Hints::new(expected).unwrap(), hints);
+        assert_eq!(Hints::from_str(expected).unwrap(), hints);
     }
 }

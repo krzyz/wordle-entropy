@@ -78,7 +78,13 @@ pub struct HintsN<const N: usize> {
 }
 
 impl<const N: usize> HintsN<N> {
-    pub fn new(hints_str: &str) -> Result<HintsN<N>, &'static str> {
+    pub fn new() -> Self {
+        Self {
+            word: [Hint::Wrong; N]
+        }
+    }
+
+    pub fn from_str(hints_str: &str) -> Result<HintsN<N>, &'static str> {
         hints_str
             .chars()
             .map(|c| match c.to_ascii_lowercase() {
