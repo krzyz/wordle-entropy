@@ -13,8 +13,11 @@ ndarray = {version = "0.15.4"}
 getrandom = {version = "*", features = ["js"]}
 rand = "0.8.5"
 rayon = {version = "1.5.1", optional = true}
-serde = "1.0.136"
+serde = { version = "1", features = ["derive"] }
 
 [features]
 default = ["parallel"]
 parallel = ["rayon", "ndarray/rayon"]
+
+[dev-dependencies]
+rstest = "0.12.0"

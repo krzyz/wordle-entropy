@@ -8,7 +8,7 @@ pub fn get_hints<const N: usize>(guess: &WordN<N>, correct: &WordN<N>) -> HintsN
         .word
         .into_iter()
         .zip(correct.word.into_iter())
-        .map(|(g, c)| if g == c { Hint::Right } else { Hint::Wrong })
+        .map(|(g, c)| if g == c { Hint::Correct } else { Hint::Wrong })
         .collect::<Vec<_>>()
         .try_into()
         .unwrap();
@@ -22,7 +22,7 @@ pub fn get_hints<const N: usize>(guess: &WordN<N>, correct: &WordN<N>) -> HintsN
         .collect::<Vec<_>>();
 
     for (g, h) in guess.word.iter().zip(hints.word.iter_mut()) {
-        if *h != Hint::Right {
+        if *h != Hint::Correct {
             if let Some(index) = left.iter().position(|&l| g == l) {
                 *h = Hint::OutOfPlace;
                 left.remove(index);
@@ -41,7 +41,7 @@ pub fn update_knowledge<const N: usize>(
         let mut known_now: HashMap<_, u8> = HashMap::new();
         for (g, h) in izip!(guess.word, hints.word) {
             match h {
-                Hint::Right | Hint::OutOfPlace => {
+                Hint::Correct | Hint::OutOfPlace => {
                     *known_now.entry(g).or_default() += 1;
                 }
                 _ => (),
@@ -61,7 +61,7 @@ pub fn update_knowledge<const N: usize>(
     let placed = izip!(knowledge.placed.word, &hints.word, &guess.word)
         .map(|(k, &h, &g)| match (k, h) {
             (PartialChar::Some(k), _) => PartialChar::Some(k),
-            (_, Hint::Right) => PartialChar::Some(g),
+            (_, Hint::Correct) => PartialChar::Some(g),
             (PartialChar::Excluded(mut excluded), _) => {
                 excluded.insert(g);
                 PartialChar::Excluded(excluded)
@@ -142,4 +142,28 @@ pub fn get_answers<const N: usize>(
         .into_iter()
         .filter(|word| check(word, knowledge))
         .collect()
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use rstest::rstest;
+    const WORDS_LENGTH: usize = 5;
+
+    type Word = WordN<WORDS_LENGTH>;
+    type Hints = HintsN<WORDS_LENGTH>;
+
+    #[rstest]
+    #[case("śląsk", "oślik", "OOWWC")]
+    #[case("abcde", "abcde", "CCCCC")]
+    #[case("abcdd", "abcde", "CCCCW")]
+    #[case("aabab", "aaabb", "CCOOC")]
+    #[case("aabab", "bxaxx", "OWOWW")]
+    #[case("cacbb", "abcba", "WOCCO")]
+    fn hints_ok(#[case] guess: &str, #[case] answer: &str, #[case] expected: &str) {
+        let hints = get_hints(&Word::new(guess), &Word::new(answer));
+        assert_eq!(Hints::new(expected).unwrap(), hints);
+    }
 }

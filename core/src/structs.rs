@@ -1,6 +1,6 @@
 use colored::Colorize;
-use serde::{Serialize, Deserialize};
 use core::fmt;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     iter,
@@ -69,7 +69,7 @@ mod arrays {
 pub enum Hint {
     Wrong,
     OutOfPlace,
-    Right,
+    Correct,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -78,9 +78,22 @@ pub struct HintsN<const N: usize> {
 }
 
 impl<const N: usize> HintsN<N> {
+    pub fn new(hints_str: &str) -> Result<HintsN<N>, &'static str> {
+        hints_str
+            .chars()
+            .map(|c| match c.to_ascii_lowercase() {
+                'w' => Ok(Hint::Wrong),
+                'o' => Ok(Hint::OutOfPlace),
+                'c' => Ok(Hint::Correct),
+                _ => Err("Wrong character"),
+            })
+            .collect::<Result<Vec<_>, _>>()?
+            .try_into()
+    }
+
     pub fn correct() -> HintsN<N> {
         HintsN {
-            word: iter::repeat(Hint::Right)
+            word: iter::repeat(Hint::Correct)
                 .take(N)
                 .collect::<Vec<_>>()
                 .try_into()
@@ -108,7 +121,7 @@ impl<const N: usize> fmt::Display for HintsN<N> {
             let square = match hint {
                 Hint::Wrong => "■".red(),
                 Hint::OutOfPlace => "■".yellow(),
-                Hint::Right => "■".green(),
+                Hint::Correct => "■".green(),
             };
 
             write!(f, "{}", square).unwrap();
