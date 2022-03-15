@@ -12,8 +12,8 @@ pub struct WordleWorker {
 impl Worker for WordleWorker {
     type Reach = Public<Self>;
     type Message = ();
-    type Input = Vec<WordN<5>>;
-    type Output = Vec<(WordN<5>, f32, f32)>;
+    type Input = Vec<WordN<char, 5>>;
+    type Output = Vec<(WordN<char, 5>, f32, f32)>;
 
     fn create(link: WorkerLink<Self>) -> Self {
         Self { link }

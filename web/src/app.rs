@@ -28,7 +28,7 @@ pub fn app() -> Html {
 
     let cb = {
         let performance = performance.clone();
-        let perf_end= perf_end.clone();
+        let perf_end = perf_end.clone();
         move |best_scores: <WordleWorker as Worker>::Output| {
             perf_end.set(Some(performance.now()));
             for (word, entropy, score) in best_scores {
@@ -44,12 +44,11 @@ pub fn app() -> Html {
         let worker = worker.clone();
         let performance = performance.clone();
         let perf_start = perf_start.clone();
+        let perf_end = perf_end.clone();
         Callback::from(move |_| {
             log::info!("call worker");
             perf_start.set(Some(performance.now()));
-            let perf_now = performance.now();
-            log::info!("{perf_now}");
-            log::info!("{perf_start:#?}");
+            perf_end.set(None);
             worker.borrow_mut().send((*words).clone());
         })
     };

@@ -2,18 +2,18 @@ use std::collections::{HashMap, HashSet};
 
 use crate::structs::{Hint, HintsN, KnowledgeN, PartialChar, WordN};
 use itertools::izip;
+use serde::{Deserialize, Serialize};
 
-pub fn get_hints<const N: usize>(guess: &WordN<N>, correct: &WordN<N>) -> HintsN<N> {
-    let mut hints = HintsN::<N>::new();
+pub fn get_hints<T, const N: usize>(guess: &WordN<T, N>, correct: &WordN<T, N>) -> HintsN<N>
+where
+    T: Serialize + Copy + Eq,
+    for<'de2> T: Deserialize<'de2>,
+{
+    let mut hints = HintsN::<N>::wrong();
     let mut left = Vec::with_capacity(N);
-    for (i, (g, c)) in guess
-        .word
-        .into_iter()
-        .zip(correct.word.into_iter())
-        .enumerate()
-    {
+    for (i, (g, c)) in guess.0.into_iter().zip(correct.0.into_iter()).enumerate() {
         if g == c {
-            hints.word[i] = Hint::Correct
+            hints.0[i] = Hint::Correct
         } else {
             left.push(c);
         }
@@ -21,9 +21,9 @@ pub fn get_hints<const N: usize>(guess: &WordN<N>, correct: &WordN<N>) -> HintsN
 
     for l in left {
         for i in 0..N {
-            if hints.word[i] == Hint::Wrong && l == guess.word[i] {
-                hints.word[i] = Hint::OutOfPlace;
-                break
+            if hints.0[i] == Hint::Wrong && l == guess.0[i] {
+                hints.0[i] = Hint::OutOfPlace;
+                break;
             }
         }
     }
@@ -32,13 +32,13 @@ pub fn get_hints<const N: usize>(guess: &WordN<N>, correct: &WordN<N>) -> HintsN
 }
 
 pub fn update_knowledge<const N: usize>(
-    guess: &WordN<N>,
+    guess: &WordN<char, N>,
     hints: &HintsN<N>,
     knowledge: KnowledgeN<N>,
 ) -> KnowledgeN<N> {
     let known_now = {
         let mut known_now: HashMap<_, u8> = HashMap::new();
-        for (g, h) in izip!(guess.word, hints.word) {
+        for (g, h) in izip!(guess.0, hints.0) {
             match h {
                 Hint::Correct | Hint::OutOfPlace => {
                     *known_now.entry(g).or_default() += 1;
@@ -50,14 +50,14 @@ pub fn update_knowledge<const N: usize>(
     };
 
     let ruled_out_now = guess
-        .word
+        .0
         .into_iter()
-        .zip(hints.word.into_iter())
+        .zip(hints.0.into_iter())
         .filter(|&(c, h)| h == Hint::Wrong && !known_now.contains_key(&c))
         .map(|(c, _)| c)
         .collect::<Vec<_>>();
 
-    let placed = izip!(knowledge.placed.word, &hints.word, &guess.word)
+    let placed = izip!(knowledge.placed.word, &hints.0, &guess.0)
         .map(|(k, &h, &g)| match (k, h) {
             (PartialChar::Some(k), _) => PartialChar::Some(k),
             (_, Hint::Correct) => PartialChar::Some(g),
@@ -96,8 +96,8 @@ pub fn update_knowledge<const N: usize>(
 }
 
 pub fn get_hints_and_update<const N: usize>(
-    guess: &WordN<N>,
-    correct: &WordN<N>,
+    guess: &WordN<char, N>,
+    correct: &WordN<char, N>,
     knowledge: KnowledgeN<N>,
 ) -> (HintsN<N>, KnowledgeN<N>) {
     let hints = get_hints(guess, correct);
@@ -106,10 +106,10 @@ pub fn get_hints_and_update<const N: usize>(
     (hints, knowledge)
 }
 
-pub fn check<const N: usize>(word: &WordN<N>, knowledge: &KnowledgeN<N>) -> bool {
+pub fn check<const N: usize>(word: &WordN<char, N>, knowledge: &KnowledgeN<N>) -> bool {
     let mut known_left = knowledge.known.clone();
 
-    for (w, p) in izip!(word.word, &knowledge.placed.word) {
+    for (w, p) in izip!(word.0, &knowledge.placed.word) {
         if knowledge.ruled_out.contains(&w) && *p != PartialChar::Some(w) {
             return false;
         }
@@ -134,9 +134,9 @@ pub fn check<const N: usize>(word: &WordN<N>, knowledge: &KnowledgeN<N>) -> bool
 }
 
 pub fn get_answers<const N: usize>(
-    words: Vec<WordN<N>>,
+    words: Vec<WordN<char, N>>,
     knowledge: &KnowledgeN<N>,
-) -> Vec<WordN<N>> {
+) -> Vec<WordN<char, N>> {
     words
         .into_iter()
         .filter(|word| check(word, knowledge))
@@ -146,11 +146,12 @@ pub fn get_answers<const N: usize>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::translator::Translator;
 
     use rstest::rstest;
     const WORDS_LENGTH: usize = 5;
 
-    type Word = WordN<WORDS_LENGTH>;
+    type Word = WordN<char, WORDS_LENGTH>;
     type Hints = HintsN<WORDS_LENGTH>;
 
     #[rstest]
@@ -161,7 +162,12 @@ mod tests {
     #[case("aabab", "bxaxx", "OWOWW")]
     #[case("cacbb", "abcba", "WOCCO")]
     fn hints_ok(#[case] guess: &str, #[case] answer: &str, #[case] expected: &str) {
-        let hints = get_hints(&Word::new(guess), &Word::new(answer));
+        let guess_w = Word::new(guess);
+        let answer_w = Word::new(answer);
+        let translator = Translator::generate(&[guess_w, answer_w]);
+        let guess_b = translator.to_bytes(&guess_w);
+        let answer_b = translator.to_bytes(&answer_w);
+        let hints = get_hints(&guess_b, &answer_b);
         assert_eq!(Hints::from_str(expected).unwrap(), hints);
     }
 }

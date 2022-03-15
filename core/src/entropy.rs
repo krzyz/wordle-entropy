@@ -5,7 +5,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
     algo,
-    structs::{HintsN, WordN},
+    structs::{HintsN, WordN}, translator::Translator,
 };
 
 /*
@@ -54,10 +54,16 @@ pub fn entropy(arr: Array1<f32>) -> f32 {
 }
 
 pub fn calculate_entropies<'a, 'b, const N: usize>(
-    all_words: &'a Vec<WordN<N>>,
-    possible_answers: &'b Vec<WordN<N>>,
-) -> IndexMap<WordN<N>, (f32, IndexMap<HintsN<N>, f32>)> {
+    all_words: &'a Vec<WordN<char, N>>,
+    possible_answers: &'b Vec<WordN<char, N>>,
+) -> IndexMap<WordN<char, N>, (f32, IndexMap<HintsN<N>, f32>)> {
     let n = possible_answers.len() as f32;
+
+    let trans_all = Translator::generate(&all_words[..]);
+    let trans_ans = Translator::generate(&possible_answers[..]);
+
+    let all_words: Vec<_> = all_words.iter().map(|w| trans_all.to_bytes(w)).collect();
+    let possible_answers: Vec<_> = possible_answers.iter().map(|w| trans_ans.to_bytes(w)).collect();
 
     #[cfg(feature = "parallel")]
     let all_words_iter = all_words.par_iter();
@@ -78,7 +84,7 @@ pub fn calculate_entropies<'a, 'b, const N: usize>(
             );
             let entropy = entropy(probs);
 
-            (guess.clone(), (entropy, guess_hints))
+            (trans_all.to_chars(guess), (entropy, guess_hints))
         })
         .collect::<Vec<_>>()
         .into_iter()

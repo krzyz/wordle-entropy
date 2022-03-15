@@ -22,11 +22,11 @@ pub fn expected_turns(x: f32, r: f32, a: f32, b: f32) -> f32 {
 }
 
 fn solve<const N: usize>(
-    initial_entropies: &IndexMap<WordN<N>, (f32, IndexMap<HintsN<N>, f32>)>,
-    words: &Vec<WordN<N>>,
-    correct: &WordN<N>,
+    initial_entropies: &IndexMap<WordN<char, N>, (f32, IndexMap<HintsN<N>, f32>)>,
+    words: &Vec<WordN<char, N>>,
+    correct: &WordN<char, N>,
     print: bool,
-) -> (Vec<WordN<N>>, Vec<HintsN<N>>, Vec<f32>, Vec<f32>) {
+) -> (Vec<WordN<char, N>>, Vec<HintsN<N>>, Vec<f32>, Vec<f32>) {
     let mut answers = words.clone();
     let mut knowledge = KnowledgeN::<N>::default();
     let mut total_entropies = Vec::<f32>::new();
@@ -106,7 +106,7 @@ fn solve<const N: usize>(
     (guesses, all_hints, total_entropies, uncertainties)
 }
 
-pub fn solve_random<const N: usize>(words: &Vec<WordN<N>>, n: usize) -> Vec<(f32, i32)> {
+pub fn solve_random<const N: usize>(words: &Vec<WordN<char, N>>, n: usize) -> Vec<(f32, i32)> {
     let correct_words = words.iter().choose_multiple(&mut rand::thread_rng(), n);
 
     let start = Instant::now();

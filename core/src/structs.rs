@@ -3,7 +3,7 @@ use core::fmt;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
-    iter,
+    iter, fmt::Display,
 };
 
 mod arrays {
@@ -73,18 +73,10 @@ pub enum Hint {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct HintsN<const N: usize> {
-    pub word: [Hint; N],
-}
+pub struct HintsN<const N: usize>(pub [Hint; N]);
 
 impl<const N: usize> HintsN<N> {
-    pub fn new() -> Self {
-        Self {
-            word: [Hint::Wrong; N]
-        }
-    }
-
-    pub fn from_str(hints_str: &str) -> Result<HintsN<N>, &'static str> {
+    pub fn from_str(hints_str: &str) -> Result<Self, &'static str> {
         hints_str
             .chars()
             .map(|c| match c.to_ascii_lowercase() {
@@ -97,33 +89,18 @@ impl<const N: usize> HintsN<N> {
             .try_into()
     }
 
-    pub fn correct() -> HintsN<N> {
-        HintsN {
-            word: iter::repeat(Hint::Correct)
-                .take(N)
-                .collect::<Vec<_>>()
-                .try_into()
-                .unwrap(),
-        }
+    pub fn correct() -> Self {
+        Self([Hint::Correct; N])
+    }
+
+    pub fn wrong() -> Self {
+        Self([Hint::Wrong; N])
     }
 }
-/*
-impl<const N: usize> Hints<N> {
-    pub fn none() -> Hints<N> {
-        HintsN {
-            word: iter::repeat(Hint::Wrong)
-                .take(N)
-                .collect::<Vec<_>>()
-                .try_into()
-                .unwrap(),
-        }
-    }
-}
-*/
 
 impl<const N: usize> fmt::Display for HintsN<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for &hint in self.word.iter() {
+        for &hint in self.0.iter() {
             let square = match hint {
                 Hint::Wrong => "■".red(),
                 Hint::OutOfPlace => "■".yellow(),
@@ -143,33 +120,42 @@ impl<const N: usize> TryFrom<Vec<Hint>> for HintsN<N> {
         if value.len() != N {
             Err("Wrong size!")
         } else {
-            Ok(Self {
-                word: value.try_into().unwrap(),
-            })
+            Ok(Self(value.try_into().unwrap()))
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
-pub struct WordN<const N: usize> {
-    #[serde(with = "arrays")]
-    pub word: [char; N],
-}
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[serde(bound = "T: Serialize, for<'de2> T: Deserialize<'de2>")]
+pub struct WordN<T, const N: usize>
+(#[serde(with = "arrays")] pub [T; N])
+where
+    T: Serialize,
+    for<'de2> T: Deserialize<'de2>;
 
-impl<const N: usize> fmt::Display for WordN<N> {
+
+impl<T, const N: usize> fmt::Display for WordN<T, N>
+where T: Display + Serialize + Copy,
+for<'de2> T: Deserialize<'de2> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for &c in self.word.iter() {
+        for &c in self.0.iter() {
             write!(f, "{c}").unwrap();
         }
         Ok(())
     }
 }
 
-impl<const N: usize> WordN<N> {
+impl <T, const N: usize> WordN<T, N>
+where T: Serialize + Copy,
+for<'de2> T: Deserialize<'de2> {
+    pub fn init(init_value: T) -> Self {
+        Self([init_value; N])
+    }
+}
+
+impl<const N: usize> WordN<char, N> {
     pub fn new(from: &str) -> Self {
-        Self {
-            word: from.chars().collect::<Vec<_>>().try_into().unwrap(),
-        }
+        Self(from.chars().collect::<Vec<_>>().try_into().unwrap())
     }
 }
 

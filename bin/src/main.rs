@@ -13,7 +13,7 @@ use wordle_entropy_core as we_core;
 const WORDS_PATH: &str = "/home/krzyz/projects/data/words_polish.txt";
 const WORDS_LENGTH: usize = 5;
 
-type Word = WordN<WORDS_LENGTH>;
+type Word = WordN<char, WORDS_LENGTH>;
 type Knowledge = KnowledgeN<WORDS_LENGTH>;
 
 // c * (x+1)^r log((x+1))
