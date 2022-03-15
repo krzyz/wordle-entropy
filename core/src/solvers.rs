@@ -23,7 +23,7 @@ pub fn expected_turns(x: f32, r: f32, a: f32, b: f32) -> f32 {
 }
 
 fn solve<const N: usize>(
-    initial_entropies: &Vec<(WordN<char, N>, (f32, Box<FxHashMap<HintsN<N>, f32>>))>,
+    initial_entropies: &Vec<(WordN<char, N>, f32)>,
     words: &Vec<WordN<char, N>>,
     correct: &WordN<char, N>,
     print: bool,
@@ -52,7 +52,7 @@ fn solve<const N: usize>(
 
         let mut scores = entropies
             .into_iter()
-            .map(|(g, (entropy, guess_hints))| {
+            .map(|(g, entropy)| {
                 let prob = if answers.contains(&g) {
                     1. / (answers.len() as f32)
                 } else {
@@ -62,31 +62,26 @@ fn solve<const N: usize>(
                 // the less the better
                 let left_diff = expected_turns(uncertainty - entropy, 0., 1.6369421, -0.029045254) * (1. - prob);
 
-                (g, (entropy, left_diff, guess_hints))
+                (g, entropy, left_diff)
             })
-            //.collect::<IndexMap<_, _>>();
             .collect::<Vec<_>>();
-        /*
-        scores.sort_by(|&_, &(_, score1, _), &_, &(_, score2, _)| {
-            score1.partial_cmp(&score2).unwrap_or(Equal)
-        });
-        */
 
-        scores.sort_by(|&(_, (_, score1, _)), &(_, (_, score2, _))| {
+        scores.sort_by(|&(_, _, score1), &(_, _, score2)| {
             score1.partial_cmp(&score2).unwrap_or(Equal)
         });
 
 
         if print {
-            for (word, (entropy, score, _)) in scores.iter().take(10) {
+            for (word, entropy, score) in scores.iter().take(10) {
                 println!("{word}: {entropy} entropy, {score} score");
             }
         }
 
-        let (guess, (_, _, guess_hints)) = scores.into_iter().next().unwrap();
+        let (guess, _, _) = scores.into_iter().next().unwrap();
 
         let (hints, knowledge_new) = get_hints_and_update(&guess, correct, knowledge);
 
+        let guess_hints = FxHashMap::<HintsN<N>, f32>::default();
         let actual_entropy = -guess_hints.get(&hints).unwrap().log2();
         knowledge = knowledge_new;
         answers = get_answers(words.clone(), &knowledge);

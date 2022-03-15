@@ -59,7 +59,7 @@ pub fn entropy(arr: Array1<f32>) -> f32 {
 pub fn calculate_entropies<'a, 'b, const N: usize>(
     all_words: &'a Vec<WordN<char, N>>,
     possible_answers: &'b Vec<WordN<char, N>>,
-) -> Vec<(WordN<char, N>, (f32, Box<FxHashMap<HintsN<N>, f32>>))> {
+) -> Vec<(WordN<char, N>, f32)> {
     let n = possible_answers.len() as f32;
 
     let trans_all = Translator::generate(&all_words[..]);
@@ -88,7 +88,7 @@ pub fn calculate_entropies<'a, 'b, const N: usize>(
             );
             let entropy = entropy(probs);
 
-            (*guess, (entropy, guess_hints))
+            (*guess, entropy)
         })
         .collect::<Vec<_>>();
 

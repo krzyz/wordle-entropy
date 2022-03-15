@@ -29,7 +29,7 @@ impl Worker for WordleWorker {
 
         let mut scores = entropies
             .into_iter()
-            .map(|(g, (entropy, guess_hints))| {
+            .map(|(g, entropy)| {
                 let prob = if answers.contains(&g) {
                     1. / (answers.len() as f32)
                 } else {
@@ -40,24 +40,18 @@ impl Worker for WordleWorker {
                 let left_diff = expected_turns(uncertainty - entropy, 0., 1.6369421, -0.029045254)
                     * (1. - prob);
 
-                (g, (entropy, left_diff, guess_hints))
+                (g, entropy, left_diff)
             })
-            //.collect::<IndexMap<_, _>>();
             .collect::<Vec<_>>();
-        /*
-        scores.sort_by(|&_, &(_, score1, _), &_, &(_, score2, _)| {
-            score1.partial_cmp(&score2).unwrap_or(Equal)
-        });
-        */
 
-        scores.sort_by(|&(_, (_, score1, _)), &(_, (_, score2, _))| {
+        scores.sort_by(|&(_, _, score1), &(_, _, score2)| {
             score1.partial_cmp(&score2).unwrap_or(Equal)
         });
 
         let best_scores: Vec<_> = scores
             .iter()
             .take(10)
-            .map(|(word, (entropy, score, _))| (word.clone(), *entropy, *score))
+            .map(|(word, entropy, score)| (word.clone(), *entropy, *score))
             .collect();
 
         self.link.respond(id, best_scores);
