@@ -1,6 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashSet};
 
 use crate::structs::{Hint, HintsN, KnowledgeN, PartialChar, WordN};
+use fxhash::FxHashMap;
 use itertools::izip;
 use serde::{Deserialize, Serialize};
 
@@ -37,7 +38,7 @@ pub fn update_knowledge<const N: usize>(
     knowledge: KnowledgeN<N>,
 ) -> KnowledgeN<N> {
     let known_now = {
-        let mut known_now: HashMap<_, u8> = HashMap::new();
+        let mut known_now: FxHashMap<_, u8> = FxHashMap::default();
         for (g, h) in izip!(guess.0, hints.0) {
             match h {
                 Hint::Correct | Hint::OutOfPlace => {

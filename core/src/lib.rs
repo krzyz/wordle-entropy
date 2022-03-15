@@ -6,3 +6,4 @@ pub mod structs;
 mod translator;
 mod util;
 pub use indexmap;
+pub use fxhash::FxHashMap;

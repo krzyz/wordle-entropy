@@ -1,4 +1,5 @@
-use indexmap::IndexMap;
+use fxhash::FxHashMap;
+//use indexmap::IndexMap;
 use ndarray::Array;
 use rand::prelude::IteratorRandom;
 use std::{cmp::Ordering::Equal, time::Instant};
@@ -22,7 +23,7 @@ pub fn expected_turns(x: f32, r: f32, a: f32, b: f32) -> f32 {
 }
 
 fn solve<const N: usize>(
-    initial_entropies: &IndexMap<WordN<char, N>, (f32, IndexMap<HintsN<N>, f32>)>,
+    initial_entropies: &Vec<(WordN<char, N>, (f32, Box<FxHashMap<HintsN<N>, f32>>))>,
     words: &Vec<WordN<char, N>>,
     correct: &WordN<char, N>,
     print: bool,
@@ -63,11 +64,18 @@ fn solve<const N: usize>(
 
                 (g, (entropy, left_diff, guess_hints))
             })
-            .collect::<IndexMap<_, _>>();
-
+            //.collect::<IndexMap<_, _>>();
+            .collect::<Vec<_>>();
+        /*
         scores.sort_by(|&_, &(_, score1, _), &_, &(_, score2, _)| {
             score1.partial_cmp(&score2).unwrap_or(Equal)
         });
+        */
+
+        scores.sort_by(|&(_, (_, score1, _)), &(_, (_, score2, _))| {
+            score1.partial_cmp(&score2).unwrap_or(Equal)
+        });
+
 
         if print {
             for (word, (entropy, score, _)) in scores.iter().take(10) {
