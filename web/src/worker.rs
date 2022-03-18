@@ -1,6 +1,5 @@
 use gloo_worker::{HandlerId, Public, Worker, WorkerLink};
 use std::cmp::Ordering::Equal;
-use wordle_entropy_core::indexmap::IndexMap;
 use wordle_entropy_core::entropy::calculate_entropies;
 use wordle_entropy_core::solvers::expected_turns;
 use wordle_entropy_core::structs::WordN;
@@ -42,13 +41,7 @@ impl Worker for WordleWorker {
 
                 (g, (entropy, left_diff, guess_hints))
             })
-            //.collect::<IndexMap<_, _>>();
             .collect::<Vec<_>>();
-        /*
-        scores.sort_by(|&_, &(_, score1, _), &_, &(_, score2, _)| {
-            score1.partial_cmp(&score2).unwrap_or(Equal)
-        });
-        */
 
         scores.sort_by(|&(_, (_, score1, _)), &(_, (_, score2, _))| {
             score1.partial_cmp(&score2).unwrap_or(Equal)

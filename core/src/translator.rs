@@ -1,14 +1,14 @@
-use indexmap::IndexMap;
+use fxhash::FxHashMap;
 use crate::structs::WordN;
 
 pub struct Translator {
-    char_to_u8: IndexMap<char, u8>,
+    char_to_u8: FxHashMap<char, u8>,
     u8_to_char: Vec<char>,
 }
 
 impl Translator {
     pub fn generate<const N: usize>(words: &[WordN<char, N>]) -> Self {
-        let mut char_to_u8 = IndexMap::new();
+        let mut char_to_u8 = FxHashMap::default();
         let mut u8_to_char = Vec::new();
         let mut u: u8 = 0;
 

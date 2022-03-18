@@ -1,5 +1,4 @@
 use fxhash::FxHashMap;
-//use indexmap::IndexMap;
 use ndarray::Array1;
 #[cfg(feature = "parallel")]
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
@@ -9,26 +8,6 @@ use crate::{
     structs::{HintsN, WordN}, translator::Translator,
 };
 
-/*
-
-pub fn norm_entropy(arr: Array1<i32>, n: i32) -> f32 {
-    let n = n as f32;
-    let arr = arr
-        .into_iter()
-        .filter(|&x| x > 1)
-        .map(|x| x as f32)
-        .collect::<Array1<f32>>();
-
-    let arr_log = {
-        let mut arr_log = arr.clone();
-        arr_log.par_mapv_inplace(|x| x.log(n));
-        arr_log
-    };
-
-    1. - 1. / (n) * (arr * arr_log).sum()
-}
-*/
-
 pub fn entropy(arr: Array1<f32>) -> f32 {
     let arr = arr
         .into_iter()
@@ -36,16 +15,6 @@ pub fn entropy(arr: Array1<f32>) -> f32 {
         .map(|x| x as f32)
         .collect::<Array1<f32>>();
 
-/*
-    #[cfg(feature = "parallel")]
-    let arr_log = {
-        let mut arr_log = arr.clone();
-        arr_log.par_mapv_inplace(|x| (x).log2());
-        arr_log
-    };
-
-    #[cfg(not(feature = "parallel"))]
-*/
     let arr_log = {
         let mut arr_log = arr.clone();
         arr_log.mapv_inplace(|x| (x).log2());
@@ -65,7 +34,6 @@ pub fn calculate_entropies<'a, 'b, const N: usize>(
     let trans_all = Translator::generate(&all_words[..]);
     let trans_ans = Translator::generate(&possible_answers[..]);
 
-    //let all_words: Vec<_> = all_words.iter().map(|w| trans_all.to_bytes(w)).collect();
     let possible_answers: Vec<_> = possible_answers.iter().map(|w| trans_ans.to_bytes(w)).collect();
 
     #[cfg(feature = "parallel")]

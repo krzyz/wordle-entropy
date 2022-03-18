@@ -1,5 +1,4 @@
 use fxhash::FxHashMap;
-//use indexmap::IndexMap;
 use ndarray::Array;
 use rand::prelude::IteratorRandom;
 use std::{cmp::Ordering::Equal, time::Instant};
@@ -10,12 +9,6 @@ use crate::{
     structs::{HintsN, KnowledgeN, WordN},
     util::print_vec,
 };
-
-/*
-pub fn expected_turns(entropy_left: f32) -> f32 {
-    2. / 9. * entropy_left + 1.
-}
-*/
 
 pub fn expected_turns(x: f32, r: f32, a: f32, b: f32) -> f32 {
     let x = x + 1.;
@@ -64,13 +57,7 @@ fn solve<const N: usize>(
 
                 (g, (entropy, left_diff, guess_hints))
             })
-            //.collect::<IndexMap<_, _>>();
             .collect::<Vec<_>>();
-        /*
-        scores.sort_by(|&_, &(_, score1, _), &_, &(_, score2, _)| {
-            score1.partial_cmp(&score2).unwrap_or(Equal)
-        });
-        */
 
         scores.sort_by(|&(_, (_, score1, _)), &(_, (_, score2, _))| {
             score1.partial_cmp(&score2).unwrap_or(Equal)
