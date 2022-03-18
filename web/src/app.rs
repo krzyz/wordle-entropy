@@ -31,9 +31,7 @@ pub fn app() -> Html {
         let perf_end = perf_end.clone();
         move |best_scores: <WordleWorker as Worker>::Output| {
             perf_end.set(Some(performance.now()));
-            for (word, entropy, score) in best_scores {
-                log::info!("{word}: {entropy} entropy, {score} score");
-            }
+            log::info!("{best_scores} score");
         }
     };
 

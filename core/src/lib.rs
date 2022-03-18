@@ -3,6 +3,7 @@ pub mod data;
 pub mod entropy;
 pub mod solvers;
 pub mod structs;
+pub mod to_seq;
 mod translator;
 mod util;
 pub use indexmap;

@@ -10,4 +10,5 @@ members = [
 gloo-console = { git = "https://github.com/krzyz/gloo" }
 
 [profile.release]
+debug = true
 opt-level = 3
