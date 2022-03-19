@@ -95,11 +95,21 @@ pub fn app() -> Html {
         let performance = performance.clone();
         let perf_start = perf_start.clone();
         let perf_end = perf_end.clone();
+        let scores = scores.clone();
         Callback::from(move |_| {
             log::info!("call worker");
             perf_start.set(Some(performance.now()));
             perf_end.set(None);
-            worker_pool.borrow_mut().send((*words).clone());
+            *scores.borrow_mut() = vec![];
+
+            let mut words_right = &words[..];
+            while words_right.len() > 1000 {
+                let (words_left, words_right_new) = words_right.split_at(1000);
+                worker_pool.borrow_mut().send((*words_left).to_vec());
+                words_right = words_right_new;
+            }
+
+            worker_pool.borrow_mut().send((*words_right).to_vec());
         })
     };
 
@@ -158,15 +168,15 @@ pub fn app() -> Html {
             </form>
             <input {onchange} value={(&*random_words_num.clone()).borrow().to_string()}/>
             <button {onclick}>{"Run"}</button>
-            <span>
+            <p>
                 { words.len() }
-            </span>
-            <ul>
-                { for scores.borrow().iter().take(10).map( |x| { html!{<li> { format!("{:#?}", x) } </li>} } ) }
-            </ul>
+            </p>
             if let (Some(perf_start), Some(perf_end)) = (*perf_start, *perf_end) {
                 <p> { format!("{:.3} ms", perf_end - perf_start) } </p>
             }
+            <ul>
+                { for scores.borrow().iter().take(10).map( |x| { html!{<li> { format!("{}, {}, {}", x.0, x.1.0, x.1.1) } </li>} } ) }
+            </ul>
         </main>
     }
 }
