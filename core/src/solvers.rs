@@ -2,6 +2,7 @@ use fxhash::FxHashMap;
 use ndarray::Array;
 use rand::prelude::IteratorRandom;
 use std::{cmp::Ordering::Equal, time::Instant};
+use crate::structs::Entropies;
 
 use crate::{
     algo::{get_answers, get_hints_and_update},
@@ -16,7 +17,7 @@ pub fn expected_turns(x: f32, r: f32, a: f32, b: f32) -> f32 {
 }
 
 fn solve<const N: usize>(
-    initial_entropies: &Vec<(WordN<char, N>, (f32, Box<FxHashMap<HintsN<N>, f32>>))>,
+    initial_entropies: &Entropies<N>,
     words: &Vec<WordN<char, N>>,
     correct: &WordN<char, N>,
     print: bool,

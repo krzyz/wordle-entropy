@@ -1,9 +1,11 @@
 use colored::Colorize;
 use core::fmt;
+use fxhash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
-    iter, fmt::Display,
+    fmt::Display,
+    iter,
 };
 
 mod arrays {
@@ -65,15 +67,18 @@ mod arrays {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub type GuessHints<const N: usize> = FxHashMap<HintsN<N>, f32>;
+pub type Entropies<const N: usize> = Vec<(WordN<char, N>, (f32, GuessHints<N>))>;
+
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Hint {
     Wrong,
     OutOfPlace,
     Correct,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct HintsN<const N: usize>(pub [Hint; N]);
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct HintsN<const N: usize>(#[serde(with = "arrays")] pub [Hint; N]);
 
 impl<const N: usize> HintsN<N> {
     pub fn from_str(hints_str: &str) -> Result<Self, &'static str> {
@@ -127,16 +132,16 @@ impl<const N: usize> TryFrom<Vec<Hint>> for HintsN<N> {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[serde(bound = "T: Serialize, for<'de2> T: Deserialize<'de2>")]
-pub struct WordN<T, const N: usize>
-(#[serde(with = "arrays")] pub [T; N])
+pub struct WordN<T, const N: usize>(#[serde(with = "arrays")] pub [T; N])
 where
     T: Serialize,
     for<'de2> T: Deserialize<'de2>;
 
-
 impl<T, const N: usize> fmt::Display for WordN<T, N>
-where T: Display + Serialize + Copy,
-for<'de2> T: Deserialize<'de2> {
+where
+    T: Display + Serialize + Copy,
+    for<'de2> T: Deserialize<'de2>,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for &c in self.0.iter() {
             write!(f, "{c}").unwrap();
@@ -145,9 +150,11 @@ for<'de2> T: Deserialize<'de2> {
     }
 }
 
-impl <T, const N: usize> WordN<T, N>
-where T: Serialize + Copy,
-for<'de2> T: Deserialize<'de2> {
+impl<T, const N: usize> WordN<T, N>
+where
+    T: Serialize + Copy,
+    for<'de2> T: Deserialize<'de2>,
+{
     pub fn init(init_value: T) -> Self {
         Self([init_value; N])
     }

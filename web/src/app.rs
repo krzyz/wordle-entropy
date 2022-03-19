@@ -1,7 +1,8 @@
-use std::rc::Rc;
-
 use gloo_file::callbacks::read_as_text;
-use gloo_worker::{Bridged, Worker};
+use gloo_worker::{Bridge, Bridged, Callback as GlooCallback, Worker};
+use std::cmp::Ordering::Equal;
+use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use web_sys::{FocusEvent, HtmlInputElement};
 use wordle_entropy_core::data::parse_words;
 use yew::{
@@ -10,6 +11,47 @@ use yew::{
 };
 
 use crate::worker::WordleWorker;
+
+pub struct WorkerPool<W> {
+    workers: Vec<Box<dyn Bridge<W>>>,
+    busy_status: Arc<Mutex<Vec<bool>>>,
+}
+
+impl<W: Worker + Bridged> WorkerPool<W> {
+    pub fn new(num_threads: usize, callback: GlooCallback<W::Output>) -> Self {
+        log::info!("new worker poool");
+        let busy_status = Arc::new(Mutex::new(vec![false; num_threads]));
+        let workers = (0..num_threads)
+            .map(|i| {
+                let callback_wrapped = {
+                    let busy_status = busy_status.clone();
+                    let callback = callback.clone();
+                    move |output: W::Output| {
+                        *busy_status.lock().unwrap().get_mut(i).unwrap() = false;
+                        callback(output)
+                    }
+                };
+
+                W::bridge(Rc::new(callback_wrapped))
+            })
+            .collect::<Vec<_>>();
+        Self {
+            workers,
+            busy_status,
+        }
+    }
+
+    pub fn send(&mut self, msg: W::Input) {
+        log::info!("Send!");
+        let mut busy_status = self.busy_status.lock().unwrap();
+        if let Some(i) = busy_status.iter().position(|&x| !x) {
+            log::info!("Sending to: {}", i);
+            self.workers[i].send(msg);
+            *busy_status.get_mut(i).unwrap() = true;
+        }
+        log::info!("{:#?}", *busy_status)
+    }
+}
 
 #[function_component(App)]
 pub fn app() -> Html {
@@ -26,22 +68,30 @@ pub fn app() -> Html {
     let file_input_node_ref = use_node_ref();
     let file_reader = use_mut_ref(|| None);
 
+    let scores =
+        use_mut_ref(|| <WordleWorker as Worker>::Output::new());
+
     let cb = {
         let performance = performance.clone();
         let perf_end = perf_end.clone();
-        move |best_scores: <WordleWorker as Worker>::Output| {
+        let scores = scores.clone();
+        move |new_scores: <WordleWorker as Worker>::Output| {
             perf_end.set(Some(performance.now()));
-            for (word, entropy, score) in best_scores {
-                log::info!("{word}: {entropy} entropy, {score} score");
-            }
+
+            let mut scores = scores.borrow_mut();
+            scores.extend(new_scores);
+
+            scores.sort_by(|&(_, (_, score1, _)), &(_, (_, score2, _))| {
+                score1.partial_cmp(&score2).unwrap_or(Equal)
+            });
         }
     };
-
-    let worker = use_mut_ref(|| WordleWorker::bridge(Rc::new(cb)));
+    let cb = Rc::new(cb);
+    let worker_pool = use_mut_ref(|| WorkerPool::<WordleWorker>::new(12, cb));
 
     let onclick = {
         let words = words.clone();
-        let worker = worker.clone();
+        let worker_pool = worker_pool.clone();
         let performance = performance.clone();
         let perf_start = perf_start.clone();
         let perf_end = perf_end.clone();
@@ -49,7 +99,7 @@ pub fn app() -> Html {
             log::info!("call worker");
             perf_start.set(Some(performance.now()));
             perf_end.set(None);
-            worker.borrow_mut().send((*words).clone());
+            worker_pool.borrow_mut().send((*words).clone());
         })
     };
 
@@ -108,8 +158,11 @@ pub fn app() -> Html {
             </form>
             <input {onchange} value={(&*random_words_num.clone()).borrow().to_string()}/>
             <button {onclick}>{"Run"}</button>
+            <span>
+                { words.len() }
+            </span>
             <ul>
-                { for words.iter().take(10).map( |x| { html!{<li> { x } </li>} } ) }
+                { for scores.borrow().iter().take(10).map( |x| { html!{<li> { format!("{:#?}", x) } </li>} } ) }
             </ul>
             if let (Some(perf_start), Some(perf_end)) = (*perf_start, *perf_end) {
                 <p> { format!("{:.3} ms", perf_end - perf_start) } </p>

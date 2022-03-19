@@ -5,7 +5,7 @@ use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIter
 
 use crate::{
     algo,
-    structs::{HintsN, WordN}, translator::Translator,
+    structs::{WordN, Entropies}, translator::Translator,
 };
 
 pub fn entropy(arr: Array1<f32>) -> f32 {
@@ -28,7 +28,7 @@ pub fn entropy(arr: Array1<f32>) -> f32 {
 pub fn calculate_entropies<'a, 'b, const N: usize>(
     all_words: &'a Vec<WordN<char, N>>,
     possible_answers: &'b Vec<WordN<char, N>>,
-) -> Vec<(WordN<char, N>, (f32, Box<FxHashMap<HintsN<N>, f32>>))> {
+) -> Entropies<N> {
     let n = possible_answers.len() as f32;
 
     let trans_all = Translator::generate(&all_words[..]);
@@ -45,7 +45,7 @@ pub fn calculate_entropies<'a, 'b, const N: usize>(
     let entropies = all_words_iter
         .map(|guess| {
             let guess_b = trans_all.to_bytes(guess);
-            let mut guess_hints = Box::new(FxHashMap::<_, f32>::default());
+            let mut guess_hints = FxHashMap::<_, f32>::default();
             for correct in possible_answers.iter() {
                 let hints = algo::get_hints(&guess_b, correct);
                 *guess_hints.entry(hints).or_default() += 1. / n;
