@@ -3,6 +3,7 @@ use crate::structs::WordN;
 
 pub struct Translator {
     char_to_u8: FxHashMap<char, u8>,
+    #[allow(dead_code)]
     u8_to_char: Vec<char>,
 }
 
@@ -27,6 +28,7 @@ impl Translator {
         }
     }
 
+    #[allow(dead_code)]
     pub fn to_chars<const N: usize>(&self, byte_word: &WordN<u8, N>) -> WordN<char, N> {
         let mut word = WordN::init('a');
         for (i, b) in byte_word.0.into_iter().enumerate() {

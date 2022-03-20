@@ -3,7 +3,8 @@ use gloo_worker::{Bridge, Bridged, Callback as GlooCallback, Worker};
 use std::cmp::Ordering::Equal;
 use std::collections::VecDeque;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
+use parking_lot::Mutex;
 use web_sys::{FocusEvent, HtmlInputElement};
 use wordle_entropy_core::data::parse_words;
 use yew::{
@@ -32,7 +33,9 @@ impl <W: Worker> Link<W> {
 impl <W: Worker + Bridged> Link<W> {
     pub fn send(&mut self, msg: W::Input) {
         if let Some(worker_pool) = self.worker_pool.upgrade() {
-            worker_pool.lock().unwrap().send(msg);
+            log::info!("lock worker pool from link send");
+            worker_pool.lock().send(msg);
+            log::info!("unlock worker pool from link send");
         }
     }
 }
@@ -46,7 +49,7 @@ pub struct WorkerPool<W: Worker> {
 
 impl<W: Worker + Bridged> WorkerPool<W> {
     pub fn new(num_threads: usize, callback: GlooCallback<W::Output>) -> Arc<Mutex<Self>> {
-        log::info!("new worker poool");
+        log::info!("new worker pool");
         let busy_status = Arc::new(Mutex::new(vec![false; num_threads]));
         let jobs_queue = Arc::new(Mutex::new(VecDeque::new()));
 
@@ -57,24 +60,29 @@ impl<W: Worker + Bridged> WorkerPool<W> {
             link: Arc::new(Mutex::new(Link::new())),
         }));
 
-        pool.lock().unwrap().link.lock().unwrap().set_pool(&pool);
+        pool.lock().link.lock().set_pool(&pool);
 
         let workers = (0..num_threads)
             .map(|i| {
                 let callback_wrapped = {
-                    let pool = pool.lock().unwrap();
+                    let pool = pool.lock();
                     let busy_status = pool.busy_status.clone();
                     let jobs_queue = pool.jobs_queue.clone();
                     let link = pool.link.clone();
                     let callback = callback.clone();
                     move |output: W::Output| {
-                        let mut jobs_queue = jobs_queue.lock().unwrap();
-                        *busy_status.lock().unwrap().get_mut(i).unwrap() = false;
+                        log::info!("lock jobs_queue from {i}");
+                        let mut jobs_queue = jobs_queue.lock();
+                        log::info!("lock busy_status from {i}");
+                        let mut busy_status = busy_status.lock();
+                        *busy_status.get_mut(i).unwrap() = false;
                         if let Some(msg) = jobs_queue.pop_front() {
-                            link.lock().unwrap().send(msg);
-                        } else if !busy_status.lock().unwrap().iter().any(|&x| x) {
+                            link.lock().send(msg);
+                        } else if !busy_status.iter().any(|&x| x) {
                             log::info!("Finished all!");
                         }
+                        log::info!("unlock busy_status from {i}");
+                        log::info!("Unlock jobs_queue from {i}");
                         callback(output)
                     }
                 };
@@ -83,22 +91,26 @@ impl<W: Worker + Bridged> WorkerPool<W> {
             })
             .collect::<Vec<_>>();
 
-        pool.lock().unwrap().workers.extend(workers);
+        pool.lock().workers.extend(workers);
 
         pool
     }
 
     pub fn send(&mut self, msg: W::Input) {
         log::info!("Send!");
-        let mut busy_status = self.busy_status.lock().unwrap();
+        log::info!("Lock busy_status from send");
+        let mut busy_status = self.busy_status.lock();
         if let Some(i) = busy_status.iter().position(|&x| !x) {
             log::info!("Sending to: {}", i);
             self.workers[i].send(msg);
             *busy_status.get_mut(i).unwrap() = true;
         } else {
-            let mut jobs_queue = self.jobs_queue.lock().unwrap();
-            jobs_queue.push_back(msg)
+            log::info!("Lock jobs_queue from send");
+            let mut jobs_queue = self.jobs_queue.lock();
+            jobs_queue.push_back(msg);
+            log::info!("Unlock jobs_queue from send");
         }
+        log::info!("Unlock busy_status from send");
     }
 }
 
@@ -125,14 +137,15 @@ pub fn app() -> Html {
         let perf_end = perf_end.clone();
         let scores = scores.clone();
         move |new_scores: <WordleWorker as Worker>::Output| {
+            {
+                let mut scores = scores.borrow_mut();
+                scores.extend(new_scores);
+
+                scores.sort_by(|&(_, (_, score1, _)), &(_, (_, score2, _))| {
+                    score1.partial_cmp(&score2).unwrap_or(Equal)
+                });
+            }
             perf_end.set(Some(performance.now()));
-
-            let mut scores = scores.borrow_mut();
-            scores.extend(new_scores);
-
-            scores.sort_by(|&(_, (_, score1, _)), &(_, (_, score2, _))| {
-                score1.partial_cmp(&score2).unwrap_or(Equal)
-            });
         }
     };
     let cb = Rc::new(cb);
@@ -157,11 +170,15 @@ pub fn app() -> Html {
             let chunk_size = *chunk_size.borrow();
             while words_right.len() > chunk_size {
                 let (words_left, words_right_new) = words_right.split_at(chunk_size);
-                worker_pool.borrow_mut().lock().unwrap().send(((*words_left).to_vec(), (*words).clone()));
+                log::info!("Lock worker_pool");
+                worker_pool.borrow_mut().lock().send(((*words_left).to_vec(), (*words).clone()));
                 words_right = words_right_new;
+                log::info!("Unlock worker_pool");
             }
 
-            worker_pool.borrow_mut().lock().unwrap().send(((*words_right).to_vec(), (*words).clone()));
+            log::info!("Lock worker_pool");
+            worker_pool.borrow_mut().lock().send(((*words_right).to_vec(), (*words).clone()));
+            log::info!("Unlock worker_pool");
         })
     };
 

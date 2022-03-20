@@ -1,4 +1,4 @@
-use gloo_worker::{HandlerId, Public, Worker, WorkerLink};
+use gloo_worker::{HandlerId, Private, Worker, WorkerLink};
 use wordle_entropy_core::entropy::calculate_entropies;
 use wordle_entropy_core::solvers::expected_turns;
 use wordle_entropy_core::structs::{WordN, GuessHints};
@@ -8,7 +8,7 @@ pub struct WordleWorker {
 }
 
 impl Worker for WordleWorker {
-    type Reach = Public<Self>;
+    type Reach = Private<Self>;
     type Message = ();
     type Input = (Vec<WordN<char, 5>>, Vec<WordN<char, 5>>);
     type Output = Vec<(WordN<char, 5>, (f32, f32, GuessHints<5>))>;

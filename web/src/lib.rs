@@ -5,10 +5,8 @@
 pub mod app;
 pub mod worker;
 
-use gloo_worker::PublicWorker;
+use gloo_worker::PrivateWorker;
 use wasm_bindgen::prelude::*;
-pub use wasm_bindgen_rayon::init_thread_pool;
-//use yew_agent::Threaded;
 
 #[wasm_bindgen(start)]
 pub fn start() {
@@ -19,6 +17,6 @@ pub fn start() {
         wasm_logger::init(wasm_logger::Config::default());
         yew::start_app::<app::App>();
     } else {
-        <worker::WordleWorker as PublicWorker>::register();
+        <worker::WordleWorker as PrivateWorker>::register();
     }
 }
