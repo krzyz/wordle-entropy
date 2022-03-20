@@ -74,11 +74,11 @@ impl<W: Worker + Bridged> WorkerPool<W> {
                         log::info!("lock jobs_queue from {i}");
                         let mut jobs_queue = jobs_queue.lock();
                         log::info!("lock busy_status from {i}");
-                        let mut busy_status = busy_status.lock();
-                        *busy_status.get_mut(i).unwrap() = false;
+                        *busy_status.lock().get_mut(i).unwrap() = false;
+                        log::info!("unlock busy_status from {i}");
                         if let Some(msg) = jobs_queue.pop_front() {
                             link.lock().send(msg);
-                        } else if !busy_status.iter().any(|&x| x) {
+                        } else if !busy_status.lock().iter().any(|&x| x) {
                             log::info!("Finished all!");
                         }
                         log::info!("unlock busy_status from {i}");
