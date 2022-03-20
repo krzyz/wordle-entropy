@@ -1,4 +1,4 @@
-use std::collections::{HashSet};
+use std::collections::HashSet;
 
 use crate::structs::{Hint, HintsN, KnowledgeN, PartialChar, WordN};
 use fxhash::FxHashMap;
@@ -148,7 +148,6 @@ pub fn get_answers<const N: usize>(
 mod tests {
     use super::*;
     use crate::translator::Translator;
-
     use rstest::rstest;
     const WORDS_LENGTH: usize = 5;
 

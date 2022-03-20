@@ -1,11 +1,12 @@
-use fxhash::FxHashMap;
+use fxhash::{FxHashMap, FxHashSet};
 use ndarray::Array1;
 #[cfg(feature = "parallel")]
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
     algo,
-    structs::{WordN, Entropies}, translator::Translator,
+    structs::{Entropies, WordN},
+    translator::Translator,
 };
 
 pub fn entropy(arr: Array1<f32>) -> f32 {
@@ -21,30 +22,35 @@ pub fn entropy(arr: Array1<f32>) -> f32 {
         arr_log
     };
 
-
     -1. * (arr * arr_log).sum()
 }
 
 pub fn calculate_entropies<'a, 'b, const N: usize>(
-    all_words: &'a Vec<WordN<char, N>>,
+    guess_words: &'a Vec<WordN<char, N>>,
     possible_answers: &'b Vec<WordN<char, N>>,
 ) -> Entropies<N> {
     let n = possible_answers.len() as f32;
 
-    let trans_all = Translator::generate(&all_words[..]);
-    let trans_ans = Translator::generate(&possible_answers[..]);
+    let all_words = guess_words
+        .into_iter()
+        .chain(possible_answers.into_iter())
+        .map(|&x| x)
+        .collect::<FxHashSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    let trans = Translator::generate(&all_words[..]);
 
-    let possible_answers: Vec<_> = possible_answers.iter().map(|w| trans_ans.to_bytes(w)).collect();
+    let possible_answers: Vec<_> = possible_answers.iter().map(|w| trans.to_bytes(w)).collect();
 
     #[cfg(feature = "parallel")]
-    let all_words_iter = all_words.par_iter().with_min_len(1000);
+    let guess_words_iter = guess_words.par_iter().with_min_len(1000);
 
     #[cfg(not(feature = "parallel"))]
-    let all_words_iter = all_words.iter();
+    let guess_words_iter = guess_words.iter();
 
-    let entropies = all_words_iter
+    let entropies = guess_words_iter
         .map(|guess| {
-            let guess_b = trans_all.to_bytes(guess);
+            let guess_b = trans.to_bytes(guess);
             let mut guess_hints = FxHashMap::<_, f32>::default();
             for correct in possible_answers.iter() {
                 let hints = algo::get_hints(&guess_b, correct);
@@ -61,4 +67,32 @@ pub fn calculate_entropies<'a, 'b, const N: usize>(
         .collect::<Vec<_>>();
 
     entropies
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::data;
+    use rstest::rstest;
+    const WORDS_LENGTH: usize = 5;
+
+    type Word = WordN<char, WORDS_LENGTH>;
+
+    const WORDS_PATH: &str = "/home/krzyz/projects/data/words_polish.txt";
+
+    #[rstest]
+    #[case("korea", 5.8375506)]
+    fn entropy_ok(#[case] guess: &str, #[case] expected: f32) {
+        let guess = Word::new(guess);
+        let words = data::load_words::<_, WORDS_LENGTH>(WORDS_PATH).unwrap();
+
+        let entropies = calculate_entropies(&vec![guess], &words);
+
+        assert_eq!(1, entropies.len());
+        assert_eq!(expected, entropies.get(0).unwrap().1 .0);
+
+        //let (_, (entropy, _)) = calculate_entropies(&words, &words).into_iter().find(|&(w, _)| w == Word::new("korea")).unwrap();
+
+        //assert_eq!(expected, entropy);
+    }
 }

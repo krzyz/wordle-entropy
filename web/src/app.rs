@@ -99,7 +99,6 @@ impl<W: Worker + Bridged> WorkerPool<W> {
             let mut jobs_queue = self.jobs_queue.lock().unwrap();
             jobs_queue.push_back(msg)
         }
-        log::info!("{:#?}", *busy_status)
     }
 }
 
@@ -114,11 +113,12 @@ pub fn app() -> Html {
     let words = use_state(|| vec![]);
     let perf_start = use_state(|| -> Option<f64> { None });
     let perf_end = use_state(|| -> Option<f64> { None });
-    let random_words_num = use_mut_ref(|| 10);
+    let chunk_size = use_mut_ref(|| 1000);
     let file_input_node_ref = use_node_ref();
     let file_reader = use_mut_ref(|| None);
 
     let scores = use_mut_ref(|| <WordleWorker as Worker>::Output::new());
+    let running = use_mut_ref(|| false);
 
     let cb = {
         let performance = performance.clone();
@@ -126,8 +126,6 @@ pub fn app() -> Html {
         let scores = scores.clone();
         move |new_scores: <WordleWorker as Worker>::Output| {
             perf_end.set(Some(performance.now()));
-
-            log::info!("Received: {}", new_scores.iter().next().unwrap().0);
 
             let mut scores = scores.borrow_mut();
             scores.extend(new_scores);
@@ -147,30 +145,33 @@ pub fn app() -> Html {
         let perf_start = perf_start.clone();
         let perf_end = perf_end.clone();
         let scores = scores.clone();
+        let chunk_size = chunk_size.clone();
         Callback::from(move |_| {
             log::info!("call worker");
             perf_start.set(Some(performance.now()));
             perf_end.set(None);
+            *running.borrow_mut() = true;
             *scores.borrow_mut() = vec![];
 
             let mut words_right = &words[..];
-            while words_right.len() > 1000 {
-                let (words_left, words_right_new) = words_right.split_at(1000);
-                worker_pool.borrow_mut().lock().unwrap().send((*words_left).to_vec());
+            let chunk_size = *chunk_size.borrow();
+            while words_right.len() > chunk_size {
+                let (words_left, words_right_new) = words_right.split_at(chunk_size);
+                worker_pool.borrow_mut().lock().unwrap().send(((*words_left).to_vec(), (*words).clone()));
                 words_right = words_right_new;
             }
 
-            worker_pool.borrow_mut().lock().unwrap().send((*words_right).to_vec());
+            worker_pool.borrow_mut().lock().unwrap().send(((*words_right).to_vec(), (*words).clone()));
         })
     };
 
     let onchange = {
-        let random_words_num = random_words_num.clone();
+        let chunk_size = chunk_size.clone();
         Callback::from(move |e: Event| {
             log::info!("logging");
             let input: HtmlInputElement = e.target_unchecked_into();
             if let Some(new_num) = input.value().parse::<usize>().ok() {
-                *random_words_num.borrow_mut() = new_num;
+                *chunk_size.borrow_mut() = new_num;
             }
         })
     };
@@ -217,7 +218,7 @@ pub fn app() -> Html {
                 <input ref={file_input_node_ref} type="file"/>
                 <button>{"Load words"}</button>
             </form>
-            <input {onchange} value={(&*random_words_num.clone()).borrow().to_string()}/>
+            <input {onchange} value={(&*chunk_size.clone()).borrow().to_string()}/>
             <button {onclick}>{"Run"}</button>
             <p>
                 { words.len() }
@@ -227,14 +228,16 @@ pub fn app() -> Html {
             }
             if words.len() > 0 {
                 <p>
-                    { scores.borrow().len() }
-                </p>
-                <p>
                     { scores.borrow().len() as f32 / words.len() as f32 }
                 </p>
+                if let Some((word, (entropy, left_turns, _))) =  scores.borrow().iter().find(|(w, _)| format!("{}", w) == "korea" ) {
+                    <p>
+                        { format!("{word}, {entropy}, {left_turns}")}
+                    </p>
+                }
             }
             <ul>
-                { for scores.borrow().iter().take(10).map( |x| { html!{<li> { format!("{}, {}, {}", x.0, x.1.0, x.1.1) } </li>} } ) }
+                { for scores.borrow().iter().take(10).map( |(word, (entropy, left_turns, _))| { html!{<li> { format!("{word}, {entropy}, {left_turns}") } </li>} } ) }
             </ul>
         </main>
     }
