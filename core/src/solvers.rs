@@ -1,4 +1,3 @@
-use fxhash::FxHashMap;
 use ndarray::Array;
 use rand::prelude::IteratorRandom;
 use std::{cmp::Ordering::Equal, time::Instant};

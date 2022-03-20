@@ -1,9 +1,9 @@
 use gloo_worker::{HandlerId, Public, Worker, WorkerLink};
-use std::cmp::Ordering::Equal;
 use wordle_entropy_core::entropy::calculate_entropies;
 use wordle_entropy_core::solvers::expected_turns;
 use wordle_entropy_core::structs::{WordN, GuessHints};
 
+#[derive(Clone)]
 pub struct WordleWorker {
     link: WorkerLink<Self>,
 }
@@ -26,7 +26,7 @@ impl Worker for WordleWorker {
         let entropies = calculate_entropies(&words, answers);
         let uncertainty = (words.len() as f32).log2();
 
-        let mut scores = entropies
+        let scores = entropies
             .into_iter()
             .map(|(g, (entropy, guess_hints))| {
                 let prob = if answers.contains(&g) {
@@ -42,10 +42,6 @@ impl Worker for WordleWorker {
                 (g, (entropy, left_diff, guess_hints))
             })
             .collect::<Vec<_>>();
-
-        scores.sort_by(|&(_, (_, score1, _)), &(_, (_, score2, _))| {
-            score1.partial_cmp(&score2).unwrap_or(Equal)
-        });
 
         self.link.respond(id, scores);
     }

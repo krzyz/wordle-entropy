@@ -1,8 +1,9 @@
 use gloo_file::callbacks::read_as_text;
 use gloo_worker::{Bridge, Bridged, Callback as GlooCallback, Worker};
 use std::cmp::Ordering::Equal;
+use std::collections::VecDeque;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Weak};
 use web_sys::{FocusEvent, HtmlInputElement};
 use wordle_entropy_core::data::parse_words;
 use yew::{
@@ -12,22 +13,68 @@ use yew::{
 
 use crate::worker::WordleWorker;
 
-pub struct WorkerPool<W> {
+pub struct Link<W: Worker> {
+    worker_pool: Weak<Mutex<WorkerPool<W>>>,
+}
+
+impl <W: Worker> Link<W> {
+    pub fn new() -> Self {
+        Self {
+            worker_pool: Weak::new(),
+        }
+    }
+
+    pub fn set_pool(&mut self, pool: &Arc<Mutex<WorkerPool<W>>>) {
+        self.worker_pool = Arc::downgrade(pool)
+    }
+}
+
+impl <W: Worker + Bridged> Link<W> {
+    pub fn send(&mut self, msg: W::Input) {
+        if let Some(worker_pool) = self.worker_pool.upgrade() {
+            worker_pool.lock().unwrap().send(msg);
+        }
+    }
+}
+
+pub struct WorkerPool<W: Worker> {
     workers: Vec<Box<dyn Bridge<W>>>,
     busy_status: Arc<Mutex<Vec<bool>>>,
+    jobs_queue: Arc<Mutex<VecDeque<W::Input>>>,
+    link: Arc<Mutex<Link<W>>>,
 }
 
 impl<W: Worker + Bridged> WorkerPool<W> {
-    pub fn new(num_threads: usize, callback: GlooCallback<W::Output>) -> Self {
+    pub fn new(num_threads: usize, callback: GlooCallback<W::Output>) -> Arc<Mutex<Self>> {
         log::info!("new worker poool");
         let busy_status = Arc::new(Mutex::new(vec![false; num_threads]));
+        let jobs_queue = Arc::new(Mutex::new(VecDeque::new()));
+
+        let pool = Arc::new(Mutex::new(Self {
+            workers: vec![],
+            busy_status,
+            jobs_queue,
+            link: Arc::new(Mutex::new(Link::new())),
+        }));
+
+        pool.lock().unwrap().link.lock().unwrap().set_pool(&pool);
+
         let workers = (0..num_threads)
             .map(|i| {
                 let callback_wrapped = {
-                    let busy_status = busy_status.clone();
+                    let pool = pool.lock().unwrap();
+                    let busy_status = pool.busy_status.clone();
+                    let jobs_queue = pool.jobs_queue.clone();
+                    let link = pool.link.clone();
                     let callback = callback.clone();
                     move |output: W::Output| {
+                        let mut jobs_queue = jobs_queue.lock().unwrap();
                         *busy_status.lock().unwrap().get_mut(i).unwrap() = false;
+                        if let Some(msg) = jobs_queue.pop_front() {
+                            link.lock().unwrap().send(msg);
+                        } else if !busy_status.lock().unwrap().iter().any(|&x| x) {
+                            log::info!("Finished all!");
+                        }
                         callback(output)
                     }
                 };
@@ -35,10 +82,10 @@ impl<W: Worker + Bridged> WorkerPool<W> {
                 W::bridge(Rc::new(callback_wrapped))
             })
             .collect::<Vec<_>>();
-        Self {
-            workers,
-            busy_status,
-        }
+
+        pool.lock().unwrap().workers.extend(workers);
+
+        pool
     }
 
     pub fn send(&mut self, msg: W::Input) {
@@ -48,6 +95,9 @@ impl<W: Worker + Bridged> WorkerPool<W> {
             log::info!("Sending to: {}", i);
             self.workers[i].send(msg);
             *busy_status.get_mut(i).unwrap() = true;
+        } else {
+            let mut jobs_queue = self.jobs_queue.lock().unwrap();
+            jobs_queue.push_back(msg)
         }
         log::info!("{:#?}", *busy_status)
     }
@@ -68,8 +118,7 @@ pub fn app() -> Html {
     let file_input_node_ref = use_node_ref();
     let file_reader = use_mut_ref(|| None);
 
-    let scores =
-        use_mut_ref(|| <WordleWorker as Worker>::Output::new());
+    let scores = use_mut_ref(|| <WordleWorker as Worker>::Output::new());
 
     let cb = {
         let performance = performance.clone();
@@ -77,6 +126,8 @@ pub fn app() -> Html {
         let scores = scores.clone();
         move |new_scores: <WordleWorker as Worker>::Output| {
             perf_end.set(Some(performance.now()));
+
+            log::info!("Received: {}", new_scores.iter().next().unwrap().0);
 
             let mut scores = scores.borrow_mut();
             scores.extend(new_scores);
@@ -105,11 +156,11 @@ pub fn app() -> Html {
             let mut words_right = &words[..];
             while words_right.len() > 1000 {
                 let (words_left, words_right_new) = words_right.split_at(1000);
-                worker_pool.borrow_mut().send((*words_left).to_vec());
+                worker_pool.borrow_mut().lock().unwrap().send((*words_left).to_vec());
                 words_right = words_right_new;
             }
 
-            worker_pool.borrow_mut().send((*words_right).to_vec());
+            worker_pool.borrow_mut().lock().unwrap().send((*words_right).to_vec());
         })
     };
 
@@ -173,6 +224,14 @@ pub fn app() -> Html {
             </p>
             if let (Some(perf_start), Some(perf_end)) = (*perf_start, *perf_end) {
                 <p> { format!("{:.3} ms", perf_end - perf_start) } </p>
+            }
+            if words.len() > 0 {
+                <p>
+                    { scores.borrow().len() }
+                </p>
+                <p>
+                    { scores.borrow().len() as f32 / words.len() as f32 }
+                </p>
             }
             <ul>
                 { for scores.borrow().iter().take(10).map( |x| { html!{<li> { format!("{}, {}, {}", x.0, x.1.0, x.1.1) } </li>} } ) }
