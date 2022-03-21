@@ -598,6 +598,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "hsl"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "575fb7f1167f3b88ed825e90eb14918ac460461fdeaa3965c6a50951dee1c970"
+
+[[package]]
 name = "image"
 version = "0.23.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1614,9 +1620,13 @@ dependencies = [
  "gloo-file 0.2.1 (git+https://github.com/krzyz/gloo)",
  "gloo-timers 0.2.3 (git+https://github.com/krzyz/gloo)",
  "gloo-worker",
+ "hsl",
  "js-sys",
  "log",
+ "num-complex",
  "once_cell",
+ "rand",
+ "rayon",
  "strum",
  "strum_macros",
  "wasm-bindgen",
