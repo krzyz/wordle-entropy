@@ -2,10 +2,10 @@
 #![recursion_limit = "1024"]
 #![allow(clippy::large_enum_variant)]
 
-pub mod app;
+//pub mod app;
 pub mod app2;
 mod demo;
-pub mod worker;
+//pub mod worker;
 mod worker2;
 
 use gloo_worker::PublicWorker;

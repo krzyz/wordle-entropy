@@ -16,7 +16,7 @@ pub fn expected_turns(x: f32, r: f32, a: f32, b: f32) -> f32 {
 }
 
 fn solve<const N: usize>(
-    initial_entropies: &Vec<(WordN<char, N>, (f32, Box<FxHashMap<HintsN<N>, f32>>))>,
+    initial_entropies: &Vec<(WordN<char, N>, (f32, FxHashMap<HintsN<N>, f32>))>,
     words: &Vec<WordN<char, N>>,
     correct: &WordN<char, N>,
     print: bool,

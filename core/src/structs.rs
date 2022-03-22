@@ -125,7 +125,7 @@ impl<const N: usize> TryFrom<Vec<Hint>> for HintsN<N> {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 #[serde(bound = "T: Serialize, for<'de2> T: Deserialize<'de2>")]
 pub struct WordN<T, const N: usize>
 (#[serde(with = "arrays")] pub [T; N])
@@ -135,10 +135,10 @@ where
 
 
 impl<T, const N: usize> fmt::Display for WordN<T, N>
-where T: Display + Serialize + Copy,
+where T: Display + Serialize,
 for<'de2> T: Deserialize<'de2> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for &c in self.0.iter() {
+        for c in self.0.iter() {
             write!(f, "{c}").unwrap();
         }
         Ok(())

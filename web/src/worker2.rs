@@ -26,7 +26,7 @@ impl Worker for DemoWorker {
     fn handle_input(&mut self, msg: Self::Input, id: HandlerId) {
         let words = &msg;
         let answers = &msg;
-        let entropy = calculate_entropies(&words, answers).into_iter().next().unwrap().1.0;
+        let entropy = calculate_entropies(words, answers).into_iter().next().unwrap().1.0;
 
         self.link.respond(id, entropy);
     }

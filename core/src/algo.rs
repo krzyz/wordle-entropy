@@ -5,13 +5,13 @@ use fxhash::FxHashMap;
 use itertools::izip;
 use serde::{Deserialize, Serialize};
 
-pub fn get_hints<T, const N: usize>(guess: &WordN<T, N>, correct: &WordN<T, N>) -> HintsN<N>
+pub fn get_hints<T, const N: usize>(guess: &WordN<T, N>, correct: &WordN<T, N>, left: &mut Vec<T>) -> HintsN<N>
 where
     T: Serialize + Copy + Eq,
     for<'de2> T: Deserialize<'de2>,
 {
     let mut hints = HintsN::<N>::wrong();
-    let mut left = Vec::with_capacity(N);
+    left.clear();
     for (i, (g, c)) in guess.0.into_iter().zip(correct.0.into_iter()).enumerate() {
         if g == c {
             hints.0[i] = Hint::Correct
@@ -22,7 +22,7 @@ where
 
     for l in left {
         for i in 0..N {
-            if hints.0[i] == Hint::Wrong && l == guess.0[i] {
+            if hints.0[i] == Hint::Wrong && *l == guess.0[i] {
                 hints.0[i] = Hint::OutOfPlace;
                 break;
             }
@@ -101,7 +101,8 @@ pub fn get_hints_and_update<const N: usize>(
     correct: &WordN<char, N>,
     knowledge: KnowledgeN<N>,
 ) -> (HintsN<N>, KnowledgeN<N>) {
-    let hints = get_hints(guess, correct);
+    let mut left = Vec::with_capacity(N);
+    let hints = get_hints(guess, correct, &mut left);
     let knowledge = update_knowledge(guess, &hints, knowledge);
 
     (hints, knowledge)
@@ -165,10 +166,11 @@ mod tests {
     fn hints_ok(#[case] guess: &str, #[case] answer: &str, #[case] expected: &str) {
         let guess_w = Word::new(guess);
         let answer_w = Word::new(answer);
-        let translator = Translator::generate(&[guess_w, answer_w]);
+        let translator = Translator::generate(&[guess_w.clone(), answer_w.clone()]);
         let guess_b = translator.to_bytes(&guess_w);
         let answer_b = translator.to_bytes(&answer_w);
-        let hints = get_hints(&guess_b, &answer_b);
+        let mut left = Vec::with_capacity(WORDS_LENGTH);
+        let hints = get_hints(&guess_b, &answer_b, &mut left);
         assert_eq!(Hints::from_str(expected).unwrap(), hints);
     }
 }

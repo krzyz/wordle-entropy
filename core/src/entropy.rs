@@ -28,7 +28,7 @@ pub fn entropy(arr: Array1<f32>) -> f32 {
 pub fn calculate_entropies<'a, 'b, const N: usize>(
     all_words: &'a Vec<WordN<char, N>>,
     possible_answers: &'b Vec<WordN<char, N>>,
-) -> Vec<(WordN<char, N>, (f32, Box<FxHashMap<HintsN<N>, f32>>))> {
+) -> Vec<(WordN<char, N>, (f32, FxHashMap<HintsN<N>, f32>))> {
     let n = possible_answers.len() as f32;
 
     let trans_all = Translator::generate(&all_words[..]);
@@ -37,7 +37,7 @@ pub fn calculate_entropies<'a, 'b, const N: usize>(
     let possible_answers: Vec<_> = possible_answers.iter().map(|w| trans_ans.to_bytes(w)).collect();
 
     #[cfg(feature = "parallel")]
-    let all_words_iter = all_words.par_iter().with_min_len(1000);
+    let all_words_iter = all_words.par_iter();
 
     #[cfg(not(feature = "parallel"))]
     let all_words_iter = all_words.iter();
@@ -45,9 +45,10 @@ pub fn calculate_entropies<'a, 'b, const N: usize>(
     let entropies = all_words_iter
         .map(|guess| {
             let guess_b = trans_all.to_bytes(guess);
-            let mut guess_hints = Box::new(FxHashMap::<_, f32>::default());
+            let mut guess_hints = FxHashMap::<_, f32>::default();
+            let mut left = Vec::with_capacity(N);
             for correct in possible_answers.iter() {
-                let hints = algo::get_hints(&guess_b, correct);
+                let hints = algo::get_hints(&guess_b, correct, &mut left);
                 *guess_hints.entry(hints).or_default() += 1. / n;
             }
 
@@ -56,7 +57,7 @@ pub fn calculate_entropies<'a, 'b, const N: usize>(
             );
             let entropy = entropy(probs);
 
-            (*guess, (entropy, guess_hints))
+            (guess.clone(), (entropy, guess_hints))
         })
         .collect::<Vec<_>>();
 
