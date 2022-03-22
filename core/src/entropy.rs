@@ -1,5 +1,5 @@
 use arrayvec::ArrayVec;
-use fxhash::FxHashMap;
+use fxhash::{FxHashMap, FxHashSet};
 use ndarray::Array1;
 #[cfg(feature = "parallel")]
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -27,25 +27,31 @@ pub fn entropy(arr: Array1<f32>) -> f32 {
 }
 
 pub fn calculate_entropies<'a, 'b, const N: usize>(
-    all_words: &'a Vec<WordN<char, N>>,
+    guess_words: &'a Vec<WordN<char, N>>,
     possible_answers: &'b Vec<WordN<char, N>>,
 ) -> Vec<(WordN<char, N>, (f32, FxHashMap<HintsN<N>, f32>))> {
     let n = possible_answers.len() as f32;
 
-    let trans_all = Translator::generate(&all_words[..]);
-    let trans_ans = Translator::generate(&possible_answers[..]);
+    let all_words = guess_words
+        .into_iter()
+        .chain(possible_answers.into_iter())
+        .map(|x| x.clone())
+        .collect::<FxHashSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    let trans = Translator::generate(&all_words[..]);
 
-    let possible_answers: Vec<_> = possible_answers.iter().map(|w| trans_ans.to_bytes(w)).collect();
+    let possible_answers: Vec<_> = possible_answers.iter().map(|w| trans.to_bytes(w)).collect();
 
     #[cfg(feature = "parallel")]
-    let all_words_iter = all_words.par_iter();
+    let guess_words_iter = guess_words.par_iter();
 
     #[cfg(not(feature = "parallel"))]
-    let all_words_iter = all_words.iter();
+    let guess_words_iter = guess_words.iter();
 
-    let entropies = all_words_iter
+    let entropies = guess_words_iter
         .map(|guess| {
-            let guess_b = trans_all.to_bytes(guess);
+            let guess_b = trans.to_bytes(guess);
             let mut guess_hints = FxHashMap::<_, f32>::default();
             for correct in possible_answers.iter() {
                 let mut left = ArrayVec::<_, N>::new();
