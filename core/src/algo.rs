@@ -1,17 +1,33 @@
-use std::collections::{HashSet};
-
 use crate::structs::{Hint, HintsN, KnowledgeN, PartialChar, WordN};
+use arrayvec::ArrayVec;
 use fxhash::FxHashMap;
 use itertools::izip;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
-pub fn get_hints<T, const N: usize>(guess: &WordN<T, N>, correct: &WordN<T, N>, left: &mut Vec<T>) -> HintsN<N>
+pub fn get_hints<T, const N: usize>(
+    guess: &WordN<T, N>,
+    correct: &WordN<T, N>,
+) -> HintsN<N>
+where
+    T: Serialize + Copy + Eq,
+    for<'de2> T: Deserialize<'de2>,
+{
+    let mut left = ArrayVec::<_, N>::new();
+    get_hints_with_work_array(guess, correct, &mut left)
+}
+
+
+pub fn get_hints_with_work_array<T, const N: usize>(
+    guess: &WordN<T, N>,
+    correct: &WordN<T, N>,
+    left: &mut ArrayVec<T, N>,
+) -> HintsN<N>
 where
     T: Serialize + Copy + Eq,
     for<'de2> T: Deserialize<'de2>,
 {
     let mut hints = HintsN::<N>::wrong();
-    left.clear();
     for (i, (g, c)) in guess.0.into_iter().zip(correct.0.into_iter()).enumerate() {
         if g == c {
             hints.0[i] = Hint::Correct
@@ -101,8 +117,7 @@ pub fn get_hints_and_update<const N: usize>(
     correct: &WordN<char, N>,
     knowledge: KnowledgeN<N>,
 ) -> (HintsN<N>, KnowledgeN<N>) {
-    let mut left = Vec::with_capacity(N);
-    let hints = get_hints(guess, correct, &mut left);
+    let hints = get_hints(guess, correct);
     let knowledge = update_knowledge(guess, &hints, knowledge);
 
     (hints, knowledge)
@@ -169,8 +184,7 @@ mod tests {
         let translator = Translator::generate(&[guess_w.clone(), answer_w.clone()]);
         let guess_b = translator.to_bytes(&guess_w);
         let answer_b = translator.to_bytes(&answer_w);
-        let mut left = Vec::with_capacity(WORDS_LENGTH);
-        let hints = get_hints(&guess_b, &answer_b, &mut left);
+        let hints = get_hints(&guess_b, &answer_b);
         assert_eq!(Hints::from_str(expected).unwrap(), hints);
     }
 }

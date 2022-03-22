@@ -1,7 +1,8 @@
+use arrayvec::ArrayVec;
 use fxhash::FxHashMap;
 use ndarray::Array1;
 #[cfg(feature = "parallel")]
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
     algo,
@@ -46,9 +47,9 @@ pub fn calculate_entropies<'a, 'b, const N: usize>(
         .map(|guess| {
             let guess_b = trans_all.to_bytes(guess);
             let mut guess_hints = FxHashMap::<_, f32>::default();
-            let mut left = Vec::with_capacity(N);
             for correct in possible_answers.iter() {
-                let hints = algo::get_hints(&guess_b, correct, &mut left);
+                let mut left = ArrayVec::<_, N>::new();
+                let hints = algo::get_hints_with_work_array(&guess_b, correct, &mut left);
                 *guess_hints.entry(hints).or_default() += 1. / n;
             }
 
