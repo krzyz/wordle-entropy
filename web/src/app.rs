@@ -3,7 +3,6 @@ use gloo_file::callbacks::read_as_text;
 use gloo_worker::{Bridged, Worker};
 use plotters::prelude::*;
 use plotters_canvas::CanvasBackend;
-use std::cell::RefCell;
 use std::cmp::Ordering::Equal;
 use std::rc::Rc;
 use web_sys::{FocusEvent, HtmlCanvasElement, HtmlInputElement, Performance};
@@ -25,15 +24,17 @@ fn draw_plot(canvas: HtmlCanvasElement, data: &[f32]) -> Result<(), Box<dyn std:
     root.fill(&WHITE)?;
 
     let y_max = data.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-    let y_max = (10. * y_max).ceil()/10.0;
+    let y_max = if data.len() > 0 {
+        (10. * y_max).ceil() / 10.0
+    } else {
+        1.0
+    };
+
     let mut chart = ChartBuilder::on(&root)
         .x_label_area_size(35u32)
         .y_label_area_size(40u32)
         .margin(5u32)
-        .build_cartesian_2d(
-            (0..data.len()).into_segmented(),
-            0.0..y_max,
-        )?;
+        .build_cartesian_2d((0..data.len()).into_segmented(), 0.0..y_max)?;
 
     chart
         .configure_mesh()
@@ -57,12 +58,13 @@ fn draw_plot(canvas: HtmlCanvasElement, data: &[f32]) -> Result<(), Box<dyn std:
     Ok(())
 }
 
-type EntropiesMut = Rc<RefCell<<WordleWorker as Worker>::Output>>;
+type WorkerOutput = <WordleWorker as Worker>::Output;
+type Entropies = Rc<WorkerOutput>;
 
 enum WordsAction {
     LoadWords(Vec<WordN<char, 5>>),
     StartCalc,
-    EndCalc(<WordleWorker as Worker>::Output, EntropiesMut),
+    EndCalc(<WordleWorker as Worker>::Output),
 }
 
 #[derive(PartialEq)]
@@ -70,6 +72,8 @@ struct WordsState {
     performance: Performance,
     perf_start: Option<f64>,
     perf_end: Option<f64>,
+    running: bool,
+    entropies: Entropies,
     words: Rc<Vec<WordN<char, 5>>>,
 }
 
@@ -84,6 +88,8 @@ impl Default for WordsState {
             performance,
             perf_start: None,
             perf_end: None,
+            running: false,
+            entropies: WorkerOutput::new().into(),
             words: vec![].into(),
         }
     }
@@ -103,19 +109,20 @@ impl Reducible for WordsState {
                 performance: self.performance.clone(),
                 perf_start: Some(self.performance.now()),
                 perf_end: None,
+                running: true,
+                entropies: WorkerOutput::new().into(),
                 words: self.words.clone(),
             }
             .into(),
-            WordsAction::EndCalc(output, entropies) => {
-                *entropies.borrow_mut() = output;
-                Self {
-                    performance: self.performance.clone(),
-                    perf_start: self.perf_start,
-                    perf_end: Some(self.performance.now()),
-                    words: self.words.clone(),
-                }
-                .into()
+            WordsAction::EndCalc(output) => Self {
+                performance: self.performance.clone(),
+                perf_start: self.perf_start,
+                perf_end: Some(self.performance.now()),
+                running: false,
+                entropies: output.into(),
+                words: self.words.clone(),
             }
+            .into(),
         }
     }
 }
@@ -127,13 +134,10 @@ pub fn app() -> Html {
     let canvas_node_ref = use_node_ref();
     let file_reader = use_mut_ref(|| None);
 
-    let entropies = use_mut_ref(|| <WordleWorker as Worker>::Output::new());
-
     let cb = {
         let word_state = word_state.clone();
-        let entropies = entropies.clone();
         move |output: <WordleWorker as Worker>::Output| {
-            word_state.dispatch(WordsAction::EndCalc(output, entropies.clone()))
+            word_state.dispatch(WordsAction::EndCalc(output))
         }
     };
 
@@ -141,14 +145,14 @@ pub fn app() -> Html {
         let canvas_node_ref = canvas_node_ref.clone();
         let word_state = word_state.clone();
         use_effect_with_deps(
-            move |_| {
-                log::info!("called");
-                if let Some(entropies) = entropies.borrow().iter().next() {
-                    let data = entropies.1 .2.values().map(|&x| x).collect::<Vec<_>>();
-                    let canvas = canvas_node_ref.cast::<HtmlCanvasElement>().unwrap();
-                    log::info!("{data:#?}");
-                    draw_plot(canvas, &data[..]).unwrap();
-                }
+            move |word_state| {
+                let canvas = canvas_node_ref.cast::<HtmlCanvasElement>().unwrap();
+                let data = if let Some(entropies) = word_state.entropies.iter().next() {
+                    entropies.1.2.values().map(|&x| x).collect::<Vec<_>>()
+                } else {
+                   vec![] 
+                };
+                draw_plot(canvas, &data[..]).unwrap();
                 || ()
             },
             word_state,
@@ -161,7 +165,6 @@ pub fn app() -> Html {
         let word_state = word_state.clone();
         let worker = worker.clone();
         Callback::from(move |_| {
-            log::info!("call worker");
             worker.borrow_mut().send((*word_state.words).clone());
             word_state.dispatch(WordsAction::StartCalc);
         })
@@ -180,17 +183,11 @@ pub fn app() -> Html {
                 .files()
                 .map(|files| gloo_file::FileList::from(files));
 
-            log::info!("{files:#?}");
-
             if let Some(files) = files {
-                log::info!("Some files");
                 if let Some(file) = files.first() {
-                    log::info!("File first");
                     *file_reader.borrow_mut() = Some(read_as_text(&file, move |res| {
-                        log::info!("Reading ");
                         match res {
                             Ok(content) => {
-                                log::info!("Read file");
                                 word_state.dispatch(WordsAction::LoadWords(parse_words::<_, 5>(
                                     content.lines(),
                                 )));
@@ -211,7 +208,11 @@ pub fn app() -> Html {
                 <input ref={file_input_node_ref} type="file"/>
                 <button>{"Load words"}</button>
             </form>
-            <button {onclick}>{"Run"}</button>
+            if word_state.running {
+                <button disabled=true>{"Run"}</button>
+            } else {
+                <button {onclick}>{"Run"}</button>
+            }
             <br />
             <canvas ref={canvas_node_ref} id="canvas" width="600" height="400"></canvas>
             if let (Some(perf_start), Some(perf_end)) = (word_state.perf_start, word_state.perf_end) {
