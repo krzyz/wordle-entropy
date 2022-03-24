@@ -1,8 +1,9 @@
 use gloo_worker::{HandlerId, Public, Worker, WorkerLink};
+use wordle_entropy_core::FxHashMap;
 use std::cmp::Ordering::Equal;
 use wordle_entropy_core::entropy::calculate_entropies;
 use wordle_entropy_core::solvers::expected_turns;
-use wordle_entropy_core::structs::WordN;
+use wordle_entropy_core::structs::{WordN, HintsN};
 
 pub struct WordleWorker {
     link: WorkerLink<Self>,
@@ -12,7 +13,7 @@ impl Worker for WordleWorker {
     type Reach = Public<Self>;
     type Message = ();
     type Input = Vec<WordN<char, 5>>;
-    type Output = Vec<(WordN<char, 5>, f32, f32)>;
+    type Output = Vec<(WordN<char, 5>, (f32, f32, FxHashMap<HintsN<5>, f32>))>;
 
     fn create(link: WorkerLink<Self>) -> Self {
         Self { link }
@@ -23,7 +24,8 @@ impl Worker for WordleWorker {
     fn handle_input(&mut self, msg: Self::Input, id: HandlerId) {
         let words = &msg;
         let answers = &msg;
-        let entropies = calculate_entropies(&words, answers);
+        let entropies = calculate_entropies(words, answers);
+
         let uncertainty = (words.len() as f32).log2();
 
         let mut scores = entropies
@@ -47,13 +49,7 @@ impl Worker for WordleWorker {
             score1.partial_cmp(&score2).unwrap_or(Equal)
         });
 
-        let best_scores: Vec<_> = scores
-            .iter()
-            .take(10)
-            .map(|(word, (entropy, score, _))| (word.clone(), *entropy, *score))
-            .collect();
-
-        self.link.respond(id, best_scores);
+        self.link.respond(id, scores);
     }
 
     fn name_of_resource() -> &'static str {

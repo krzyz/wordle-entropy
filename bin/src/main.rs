@@ -10,7 +10,8 @@ use we_core::solvers::solve_random;
 use we_core::structs::{KnowledgeN, WordN};
 use wordle_entropy_core as we_core;
 
-const WORDS_PATH: &str = "/home/krzyz/projects/data/words_polish.txt";
+//const WORDS_PATH: &str = "/home/krzyz/projects/data/words_polish.txt";
+const WORDS_PATH: &str = "/home/krzyz/projects/data/scrabble-polish-words.txt";
 const WORDS_LENGTH: usize = 5;
 
 type Word = WordN<char, WORDS_LENGTH>;
