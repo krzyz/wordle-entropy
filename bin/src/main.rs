@@ -27,7 +27,6 @@ pub fn log_f<S: Scalar + Float>(x: &DVector<S>, r: S) -> DVector<S> {
     x.map(|x| x + One::one()).map(|x| x.powf(r) * x.ln())
 }
 
-
 pub fn log_f_dr<S: Scalar + Float>(rvec: &DVector<S>, r: S) -> DVector<S> {
     rvec.map(|x| x + One::one())
         .map(|x| r * x.powf(r - One::one()) * x.ln())
@@ -88,33 +87,46 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (a, b, r) = fit(unc_data.clone());
     println!("{r}, {a}, {b}");
 
-    let y_max = 1.
-        + unc_data
-            .iter()
-            .map(|&(_, left)| left)
-            .max_by(|x, y| x.partial_cmp(y).unwrap())
-            .unwrap_or(7.) as f32;
-    let x_max = (words.len() as f32).log2() + 1.;
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let y_max = 1.
+            + unc_data
+                .iter()
+                .map(|&(_, left)| left)
+                .max_by(|x, y| x.partial_cmp(y).unwrap())
+                .unwrap_or(7.) as f32;
+        let x_max = (words.len() as f32).log2() + 1.;
 
-    let root = BitMapBackend::new("/tmp/0.png", (1000, 700)).into_drawing_area();
-    root.fill(&WHITE)?;
-    let root = root.margin(10, 10, 10, 10);
-    let mut chart = ChartBuilder::on(&root)
-        .caption("y=x^2", ("sans-serif", 50).into_font())
-        .margin(5)
-        .x_label_area_size(30)
-        .y_label_area_size(30)
-        .build_cartesian_2d(0f32..x_max, 0f32..y_max)?;
+        let root = BitMapBackend::new("/tmp/0.png", (1000, 700)).into_drawing_area();
+        root.fill(&WHITE)?;
+        let root = root.margin(10, 10, 10, 10);
+        let mut chart = ChartBuilder::on(&root)
+            .caption("y=x^2", ("sans-serif", 50).into_font())
+            .margin(5u32)
+            .x_label_area_size(30u32)
+            .y_label_area_size(30u32)
+            .build_cartesian_2d(0f32..x_max, 0f32..y_max)?;
 
-    chart.configure_mesh().draw()?;
+        chart.configure_mesh().draw()?;
 
-    let c = 5.;
-    chart.draw_series(LineSeries::new((0..=((c * x_max.floor()) as i32)).map(|x| (x as f32)/c).map(|x| (x, log_f_s(x, r, a, b))), &RED))?;
-    //chart.draw_series(LineSeries::new((0..=(x_max.floor() as i32)).map(|x| (x as f32, (x*x) as f32)), &RED))?;
+        let c = 5.;
+        chart.draw_series(LineSeries::new(
+            (0..=((c * x_max.floor()) as i32))
+                .map(|x| (x as f32) / c)
+                .map(|x| (x, log_f_s(x, r, a, b))),
+            &RED,
+        ))?;
+        //chart.draw_series(LineSeries::new((0..=(x_max.floor() as i32)).map(|x| (x as f32, (x*x) as f32)), &RED))?;
 
-    chart.draw_series(PointSeries::of_element(unc_data, 2, &BLACK, &|c, s, st| {
-        return Circle::new(c, s, st.filled());
-    }))?;
+        chart.draw_series(PointSeries::of_element(
+            unc_data,
+            2,
+            &BLACK,
+            &|c, s: i32, st| {
+                return Circle::new(c, s, st.filled());
+            },
+        ))?;
+    }
 
     println!("ok");
 
