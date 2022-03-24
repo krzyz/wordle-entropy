@@ -1,3 +1,13 @@
-ul, li {list-style-type: none;}
+ul, li {
+  list-style-type: none;
+}
 
-li {padding-left: 2em; text-indent: -2em;}
+li {
+  padding-left: 2em; text-indent: -2em;
+}
+
+ul.words_entropies_list {
+  height: 400px;
+  overflow:hidden;
+  overflow-y:scroll;
+}

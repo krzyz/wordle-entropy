@@ -9,8 +9,8 @@ use web_sys::{FocusEvent, HtmlCanvasElement, HtmlInputElement, Performance};
 use wordle_entropy_core::data::parse_words;
 use wordle_entropy_core::structs::WordN;
 use yew::{
-    classes, function_component, html, use_effect_with_deps, use_mut_ref, use_node_ref,
-    use_reducer, use_state, Callback, Html, Reducible, UseStateHandle,
+    classes, events::Event, function_component, html, use_effect_with_deps, use_mut_ref,
+    use_node_ref, use_reducer, use_state, Callback, Html, Reducible, TargetCast, UseStateHandle,
 };
 
 fn draw_plot(canvas: HtmlCanvasElement, data: &[f32]) -> Result<(), Box<dyn std::error::Error>> {
@@ -24,11 +24,7 @@ fn draw_plot(canvas: HtmlCanvasElement, data: &[f32]) -> Result<(), Box<dyn std:
     root.fill(&WHITE)?;
 
     let y_max = data.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-    let y_max = if data.len() > 0 {
-        y_max + 0.02
-    } else {
-        1.0
-    };
+    let y_max = if data.len() > 0 { y_max + 0.02 } else { 1.0 };
 
     let mut chart = ChartBuilder::on(&root)
         .x_label_area_size(35u32)
@@ -152,10 +148,17 @@ pub fn app() -> Html {
             move |(word_state, selected_word)| {
                 let canvas = canvas_node_ref.cast::<HtmlCanvasElement>().unwrap();
 
-                let data = selected_word.as_ref().map(|selected_word| {
-                    let word_entropy = word_state.entropies.iter().find(|&(word, _)| word == selected_word);
-                    word_entropy.map(|x| { x.1.2.values().map(|&x| x).collect::<Vec<_>>() })
-                }).flatten().unwrap_or(vec![]);
+                let data = selected_word
+                    .as_ref()
+                    .map(|selected_word| {
+                        let word_entropy = word_state
+                            .entropies
+                            .iter()
+                            .find(|&(word, _)| word == selected_word);
+                        word_entropy.map(|x| x.1 .2.values().map(|&x| x).collect::<Vec<_>>())
+                    })
+                    .flatten()
+                    .unwrap_or(vec![]);
 
                 draw_plot(canvas, &data[..]).unwrap();
                 || ()
@@ -213,6 +216,17 @@ pub fn app() -> Html {
         })
     };
 
+    let max_words_shown = use_state(|| 10);
+    let on_max_words_shown_change = {
+        let max_words_shown = max_words_shown.clone();
+        Callback::from(move |e: Event| {
+            let input: HtmlInputElement = e.target_unchecked_into();
+            if let Some(new_num) = input.value().parse::<usize>().ok() {
+                max_words_shown.set(new_num);
+            }
+        })
+    };
+
     html! {
         <main>
             <div class="container">
@@ -240,9 +254,11 @@ pub fn app() -> Html {
                         }
                     </div>
                     <div class="column">
-                        <ul>
+                        <label for="max_words_shown_input">{"Max words shown:"}</label>
+                        <input id="max_words_shown_input" onchange={on_max_words_shown_change} value={(*max_words_shown).to_string()}/>
+                        <ul class="words_entropies_list">
                             {
-                                word_state.entropies.iter().take(10).map(|(word, (entropy, left_turns, _))| {
+                                word_state.entropies.iter().take(*max_words_shown).map(|(word, (entropy, left_turns, _))| {
                                     html! {
                                         <li
                                             key={format!("{word}")}
