@@ -4,6 +4,7 @@ use gloo_worker::{Bridged, Worker};
 use plotters::prelude::*;
 use plotters_canvas::CanvasBackend;
 use std::cell::RefCell;
+use std::cmp::Ordering::Equal;
 use std::rc::Rc;
 use web_sys::{FocusEvent, HtmlCanvasElement, HtmlInputElement, Performance};
 use wordle_entropy_core::data::parse_words;
@@ -18,31 +19,35 @@ fn draw_plot(canvas: HtmlCanvasElement, data: &[f32]) -> Result<(), Box<dyn std:
         .unwrap()
         .into_drawing_area();
 
+    let mut data = data.iter().copied().collect::<Vec<_>>();
+    data.sort_by(|v1, v2| v2.partial_cmp(v1).unwrap_or(Equal));
+
     root.fill(&WHITE)?;
 
+    let y_max = data.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+    let y_max = (10. * y_max).ceil()/10.0;
     let mut chart = ChartBuilder::on(&root)
         .x_label_area_size(35u32)
         .y_label_area_size(40u32)
         .margin(5u32)
-        .caption("Histogram Test", ("sans-serif", 50.0f32))
         .build_cartesian_2d(
             (0..data.len()).into_segmented(),
-            0.0..(data.iter().copied().fold(f32::NEG_INFINITY, f32::max)),
+            0.0..y_max,
         )?;
 
     chart
         .configure_mesh()
         .disable_x_mesh()
         .bold_line_style(&WHITE.mix(0.3))
-        .y_desc("Count")
-        .x_desc("Bucket")
+        .disable_x_axis()
+        .x_desc("probability")
         .axis_desc_style(("sans-serif", 15u32))
         .draw()?;
 
     chart.draw_series(data.into_iter().enumerate().map(|(x, y)| {
         let x0 = SegmentValue::Exact(x);
         let x1 = SegmentValue::Exact(x + 1);
-        let mut bar = Rectangle::new([(x0, 0.), (x1, *y)], BLUE.filled());
+        let mut bar = Rectangle::new([(x0, 0.), (x1, y)], BLUE.filled());
         bar.set_margin(0, 0, 5, 5);
         bar
     }))?;
@@ -52,10 +57,12 @@ fn draw_plot(canvas: HtmlCanvasElement, data: &[f32]) -> Result<(), Box<dyn std:
     Ok(())
 }
 
+type EntropiesMut = Rc<RefCell<<WordleWorker as Worker>::Output>>;
+
 enum WordsAction {
     LoadWords(Vec<WordN<char, 5>>),
     StartCalc,
-    EndCalc(<WordleWorker as Worker>::Output),
+    EndCalc(<WordleWorker as Worker>::Output, EntropiesMut),
 }
 
 #[derive(PartialEq)]
@@ -63,7 +70,6 @@ struct WordsState {
     performance: Performance,
     perf_start: Option<f64>,
     perf_end: Option<f64>,
-    entropies: Rc<RefCell<<WordleWorker as Worker>::Output>>,
     words: Rc<Vec<WordN<char, 5>>>,
 }
 
@@ -78,7 +84,6 @@ impl Default for WordsState {
             performance,
             perf_start: None,
             perf_end: None,
-            entropies: Rc::new(RefCell::new(<WordleWorker as Worker>::Output::new().into())),
             words: vec![].into(),
         }
     }
@@ -98,17 +103,15 @@ impl Reducible for WordsState {
                 performance: self.performance.clone(),
                 perf_start: Some(self.performance.now()),
                 perf_end: None,
-                entropies: self.entropies.clone(),
                 words: self.words.clone(),
             }
             .into(),
-            WordsAction::EndCalc(output) => {
-                *self.entropies.borrow_mut() = output;
+            WordsAction::EndCalc(output, entropies) => {
+                *entropies.borrow_mut() = output;
                 Self {
                     performance: self.performance.clone(),
                     perf_start: self.perf_start,
                     perf_end: Some(self.performance.now()),
-                    entropies: self.entropies.clone(),
                     words: self.words.clone(),
                 }
                 .into()
@@ -124,10 +127,13 @@ pub fn app() -> Html {
     let canvas_node_ref = use_node_ref();
     let file_reader = use_mut_ref(|| None);
 
+    let entropies = use_mut_ref(|| <WordleWorker as Worker>::Output::new());
+
     let cb = {
         let word_state = word_state.clone();
+        let entropies = entropies.clone();
         move |output: <WordleWorker as Worker>::Output| {
-            word_state.dispatch(WordsAction::EndCalc(output))
+            word_state.dispatch(WordsAction::EndCalc(output, entropies.clone()))
         }
     };
 
@@ -135,9 +141,9 @@ pub fn app() -> Html {
         let canvas_node_ref = canvas_node_ref.clone();
         let word_state = word_state.clone();
         use_effect_with_deps(
-            move |word_state| {
+            move |_| {
                 log::info!("called");
-                if let Some(entropies) = word_state.entropies.borrow().iter().next() {
+                if let Some(entropies) = entropies.borrow().iter().next() {
                     let data = entropies.1 .2.values().map(|&x| x).collect::<Vec<_>>();
                     let canvas = canvas_node_ref.cast::<HtmlCanvasElement>().unwrap();
                     log::info!("{data:#?}");
