@@ -9,8 +9,8 @@ use web_sys::{FocusEvent, HtmlCanvasElement, HtmlInputElement, Performance};
 use wordle_entropy_core::data::parse_words;
 use wordle_entropy_core::structs::WordN;
 use yew::{
-    function_component, html, use_effect_with_deps, use_mut_ref, use_node_ref, use_reducer,
-    Callback, Reducible,
+    classes, function_component, html, use_effect_with_deps, use_mut_ref, use_node_ref,
+    use_reducer, use_state, Callback, Html, Reducible,
 };
 
 fn draw_plot(canvas: HtmlCanvasElement, data: &[f32]) -> Result<(), Box<dyn std::error::Error>> {
@@ -133,6 +133,7 @@ pub fn app() -> Html {
     let file_input_node_ref = use_node_ref();
     let canvas_node_ref = use_node_ref();
     let file_reader = use_mut_ref(|| None);
+    let selected_word = use_state(|| -> Option<WordN<char, 5>> { None });
 
     let cb = {
         let word_state = word_state.clone();
@@ -144,13 +145,15 @@ pub fn app() -> Html {
     {
         let canvas_node_ref = canvas_node_ref.clone();
         let word_state = word_state.clone();
+        let selected_word = selected_word.clone();
         use_effect_with_deps(
             move |word_state| {
                 let canvas = canvas_node_ref.cast::<HtmlCanvasElement>().unwrap();
                 let data = if let Some(entropies) = word_state.entropies.iter().next() {
-                    entropies.1.2.values().map(|&x| x).collect::<Vec<_>>()
+                    selected_word.set(Some(entropies.0.clone()));
+                    entropies.1 .2.values().map(|&x| x).collect::<Vec<_>>()
                 } else {
-                   vec![] 
+                    vec![]
                 };
                 draw_plot(canvas, &data[..]).unwrap();
                 || ()
@@ -185,16 +188,14 @@ pub fn app() -> Html {
 
             if let Some(files) = files {
                 if let Some(file) = files.first() {
-                    *file_reader.borrow_mut() = Some(read_as_text(&file, move |res| {
-                        match res {
-                            Ok(content) => {
-                                word_state.dispatch(WordsAction::LoadWords(parse_words::<_, 5>(
-                                    content.lines(),
-                                )));
-                            }
-                            Err(err) => {
-                                log::info!("Reading file error: {err}");
-                            }
+                    *file_reader.borrow_mut() = Some(read_as_text(&file, move |res| match res {
+                        Ok(content) => {
+                            word_state.dispatch(WordsAction::LoadWords(parse_words::<_, 5>(
+                                content.lines(),
+                            )));
+                        }
+                        Err(err) => {
+                            log::info!("Reading file error: {err}");
                         }
                     }));
                 }
@@ -204,20 +205,48 @@ pub fn app() -> Html {
 
     html! {
         <main>
-            <form onsubmit={onload}>
-                <input ref={file_input_node_ref} type="file"/>
-                <button>{"Load words"}</button>
-            </form>
-            if word_state.running {
-                <button disabled=true>{"Run"}</button>
-            } else {
-                <button {onclick}>{"Run"}</button>
-            }
-            <br />
-            <canvas ref={canvas_node_ref} id="canvas" width="600" height="400"></canvas>
-            if let (Some(perf_start), Some(perf_end)) = (word_state.perf_start, word_state.perf_end) {
-                <p> { format!("{:.3} ms", perf_end - perf_start) } </p>
-            }
+            <div class="container">
+                <div class="columns">
+                    <div class="column">
+                        <form onsubmit={onload}>
+                            <input class="btn" ref={file_input_node_ref} type="file"/>
+                            <button class="btn btn-primary">{"Load words"}</button>
+                        </form>
+                        <button class="btn btn-primary" disabled={word_state.running} {onclick}>{"Run"}</button>
+                        {
+                            if word_state.running {
+                                html!(<div class="d-inline-block loading p-2"></div>)
+                            } else {
+                                html!()
+                            }
+                        }
+                        <br />
+                        <canvas ref={canvas_node_ref} id="canvas" width="600" height="400"></canvas>
+                        if let (Some(perf_start), Some(perf_end)) = (word_state.perf_start, word_state.perf_end) {
+                            <p> { format!("{:.3} ms", perf_end - perf_start) } </p>
+                        }
+                    </div>
+                    <div class="column">
+                        <ul>
+                            {
+                                word_state.entropies.iter().take(10).map(|(word, (entropy, left_turns, _))| {
+                                    html! {
+                                        <li
+                                            key={format!("{word}")}
+                                            class={classes!(
+                                                "c-hand",
+                                                (*selected_word).clone().map(|selected_word| { *word == selected_word }).map(|is_selected| is_selected.then(|| Some("text-primary")))
+                                            )}
+                                        >
+                                            {format!("{word}: {entropy}, {left_turns}")}
+                                        </li>
+                                    }
+                                }).collect::<Html>()
+                            }
+                        </ul>
+                    </div>
+                </div>
+            </div>
         </main>
     }
 }
