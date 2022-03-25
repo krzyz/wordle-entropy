@@ -6,7 +6,7 @@ use plotters_canvas::CanvasBackend;
 use std::cmp::Ordering::Equal;
 use std::rc::Rc;
 use web_sys::{FocusEvent, HtmlCanvasElement, HtmlInputElement, Performance};
-use wordle_entropy_core::data::parse_words;
+use wordle_entropy_core::{data::parse_words, structs::Dictionary};
 use wordle_entropy_core::structs::WordN;
 use yew::{
     classes, events::Event, function_component, html, use_effect_with_deps, use_mut_ref,
@@ -56,7 +56,7 @@ type WorkerOutput = <WordleWorker as Worker>::Output;
 type Entropies = Rc<WorkerOutput>;
 
 enum WordsAction {
-    LoadWords(Vec<WordN<char, 5>>),
+    LoadWords(Dictionary<5>),
     StartCalc,
     EndCalc(<WordleWorker as Worker>::Output),
 }
@@ -68,7 +68,7 @@ struct WordsState {
     perf_end: Option<f64>,
     running: bool,
     entropies: Entropies,
-    words: Rc<Vec<WordN<char, 5>>>,
+    dictionary: Rc<Dictionary<5>>,
 }
 
 impl Default for WordsState {
@@ -84,7 +84,7 @@ impl Default for WordsState {
             perf_end: None,
             running: false,
             entropies: WorkerOutput::new().into(),
-            words: vec![].into(),
+            dictionary: Dictionary::new(vec![]).into(),
         }
     }
 }
@@ -94,9 +94,9 @@ impl Reducible for WordsState {
 
     fn reduce(self: Rc<Self>, action: Self::Action) -> Rc<Self> {
         match action {
-            WordsAction::LoadWords(words) => {
+            WordsAction::LoadWords(dictionary) => {
                 let mut new_state = Self::default();
-                new_state.words = Rc::new(words);
+                new_state.dictionary = Rc::new(dictionary);
                 new_state.into()
             }
             WordsAction::StartCalc => Self {
@@ -105,7 +105,7 @@ impl Reducible for WordsState {
                 perf_end: None,
                 running: true,
                 entropies: WorkerOutput::new().into(),
-                words: self.words.clone(),
+                dictionary: self.dictionary.clone(),
             }
             .into(),
             WordsAction::EndCalc(output) => Self {
@@ -114,7 +114,7 @@ impl Reducible for WordsState {
                 perf_end: Some(self.performance.now()),
                 running: false,
                 entropies: output.into(),
-                words: self.words.clone(),
+                dictionary: self.dictionary.clone(),
             }
             .into(),
         }
@@ -133,8 +133,8 @@ pub fn app() -> Html {
         let word_state = word_state.clone();
         let selected_word = selected_word.clone();
         move |output: <WordleWorker as Worker>::Output| {
-            if let Some((word, _)) = output.iter().next() {
-                selected_word.set(Some(word.clone()));
+            if let Some((entropies_data, _)) = output.iter().next() {
+                selected_word.set(Some(entropies_data.word.clone()));
             }
             word_state.dispatch(WordsAction::EndCalc(output))
         }
@@ -154,8 +154,8 @@ pub fn app() -> Html {
                         let word_entropy = word_state
                             .entropies
                             .iter()
-                            .find(|&(word, _)| word == selected_word);
-                        word_entropy.map(|x| x.1 .2.values().map(|&x| x).collect::<Vec<_>>())
+                            .find(|&(entropies_data, _)| &entropies_data.word == selected_word);
+                        word_entropy.map(|(entropies_data, _)| entropies_data.probabilities.values().map(|&x| x).collect::<Vec<_>>())
                     })
                     .flatten()
                     .unwrap_or(vec![]);
@@ -173,7 +173,7 @@ pub fn app() -> Html {
         let word_state = word_state.clone();
         let worker = worker.clone();
         Callback::from(move |_| {
-            worker.borrow_mut().send((*word_state.words).clone());
+            worker.borrow_mut().send((*word_state.dictionary).clone());
             word_state.dispatch(WordsAction::StartCalc);
         })
     };
@@ -203,9 +203,10 @@ pub fn app() -> Html {
                 if let Some(file) = files.first() {
                     *file_reader.borrow_mut() = Some(read_as_text(&file, move |res| match res {
                         Ok(content) => {
-                            word_state.dispatch(WordsAction::LoadWords(parse_words::<_, 5>(
+                            let words = parse_words::<_, 5>(
                                 content.lines(),
-                            )));
+                            );
+                            word_state.dispatch(WordsAction::LoadWords(Dictionary::new(words)));
                         }
                         Err(err) => {
                             log::info!("Reading file error: {err}");
@@ -258,7 +259,9 @@ pub fn app() -> Html {
                         <input id="max_words_shown_input" onchange={on_max_words_shown_change} value={(*max_words_shown).to_string()}/>
                         <ul class="words_entropies_list">
                             {
-                                word_state.entropies.iter().take(*max_words_shown).map(|(word, (entropy, left_turns, _))| {
+                                word_state.entropies.iter().take(*max_words_shown).map(|(entropy_data, left_turns)| {
+                                    let word = &entropy_data.word;
+                                    let entropy = &entropy_data.entropy;
                                     html! {
                                         <li
                                             key={format!("{word}")}

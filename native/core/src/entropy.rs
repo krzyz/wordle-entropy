@@ -1,12 +1,12 @@
 use arrayvec::ArrayVec;
-use fxhash::{FxHashMap, FxHashSet};
+use fxhash::FxHashMap;
 use ndarray::Array1;
 #[cfg(feature = "parallel")]
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
     algo,
-    structs::{HintsN, WordN}, translator::Translator,
+    structs::{WordN, EntropiesData, Dictionary},
 };
 
 pub fn entropy(arr: Array1<f32>) -> f32 {
@@ -26,20 +26,14 @@ pub fn entropy(arr: Array1<f32>) -> f32 {
     -1. * (arr * arr_log).sum()
 }
 
-pub fn calculate_entropies<'a, 'b, const N: usize>(
-    guess_words: &'a Vec<WordN<char, N>>,
-    possible_answers: &'b Vec<WordN<char, N>>,
-) -> Vec<(WordN<char, N>, (f32, FxHashMap<HintsN<N>, f32>))> {
+pub fn calculate_entropies<const N: usize>(
+    dictionary: &Dictionary<N>,
+    possible_answers: &Vec<WordN<char, N>>,
+) -> Vec<EntropiesData<N>> {
     let n = possible_answers.len() as f32;
 
-    let all_words = guess_words
-        .into_iter()
-        .chain(possible_answers.into_iter())
-        .map(|x| x.clone())
-        .collect::<FxHashSet<_>>()
-        .into_iter()
-        .collect::<Vec<_>>();
-    let trans = Translator::generate(&all_words[..]);
+    let guess_words = &dictionary.words;
+    let trans = &dictionary.translator;
 
     let possible_answers: Vec<_> = possible_answers.iter().map(|w| trans.to_bytes(w)).collect();
 
@@ -64,7 +58,7 @@ pub fn calculate_entropies<'a, 'b, const N: usize>(
             );
             let entropy = entropy(probs);
 
-            (guess.clone(), (entropy, guess_hints))
+            EntropiesData::new(guess.clone(), entropy, guess_hints)
         })
         .collect::<Vec<_>>();
 

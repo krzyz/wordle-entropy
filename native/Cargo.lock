@@ -1239,8 +1239,3 @@ dependencies = [
  "rstest",
  "serde",
 ]
-
-[[patch.unused]]
-name = "gloo-console"
-version = "0.2.1"
-source = "git+https://github.com/krzyz/gloo#c88464b27637a58038439ae9c702ce6b421c9575"

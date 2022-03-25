@@ -1,13 +1,13 @@
+use crate::{arrays, translator::Translator};
 use colored::Colorize;
-use crate::arrays;
 use core::fmt;
+use fxhash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
     iter,
 };
-
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Hint {
@@ -159,5 +159,39 @@ pub struct KnowledgeN<const N: usize> {
 impl<const N: usize> KnowledgeN<N> {
     pub fn none() -> Self {
         Self::default()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct EntropiesData<const N: usize> {
+    pub word: WordN<char, N>,
+    pub entropy: f32,
+    pub probabilities: FxHashMap<HintsN<N>, f32>,
+}
+
+impl<const N: usize> EntropiesData<N> {
+    pub fn new(
+        word: WordN<char, N>,
+        entropy: f32,
+        probabilities: FxHashMap<HintsN<N>, f32>,
+    ) -> Self {
+        EntropiesData {
+            word,
+            entropy,
+            probabilities,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Dictionary<const N: usize> {
+    pub words: Vec<WordN<char, N>>,
+    pub translator: Translator,
+}
+
+impl<const N: usize> Dictionary<N> {
+    pub fn new(words: Vec<WordN<char, N>>) -> Self {
+        let translator = Translator::generate(&words);
+        Self { words, translator }
     }
 }

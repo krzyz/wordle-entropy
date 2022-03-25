@@ -4,9 +4,3 @@ members = [
     "bin",
     "core",
 ]
-
-[patch.crates-io]
-gloo-console = { git = "https://github.com/krzyz/gloo" }
-
-[profile.release]
-opt-level = 3

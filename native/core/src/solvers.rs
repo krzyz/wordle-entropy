@@ -1,4 +1,3 @@
-use fxhash::FxHashMap;
 use ndarray::Array;
 use rand::prelude::IteratorRandom;
 use std::{cmp::Ordering::Equal, time::Instant};
@@ -6,7 +5,7 @@ use std::{cmp::Ordering::Equal, time::Instant};
 use crate::{
     algo::{get_answers, get_hints_and_update},
     entropy::calculate_entropies,
-    structs::{HintsN, KnowledgeN, WordN},
+    structs::{HintsN, KnowledgeN, WordN, Dictionary, EntropiesData},
     util::print_vec,
 };
 
@@ -16,11 +15,12 @@ pub fn expected_turns(x: f32, r: f32, a: f32, b: f32) -> f32 {
 }
 
 fn solve<const N: usize>(
-    initial_entropies: &Vec<(WordN<char, N>, (f32, FxHashMap<HintsN<N>, f32>))>,
-    words: &Vec<WordN<char, N>>,
+    initial_entropies: &Vec<EntropiesData<N>>,
+    dictionary: &Dictionary<N>,
     correct: &WordN<char, N>,
     print: bool,
 ) -> (Vec<WordN<char, N>>, Vec<HintsN<N>>, Vec<f32>, Vec<f32>) {
+    let words = &dictionary.words;
     let mut answers = words.clone();
     let mut knowledge = KnowledgeN::<N>::default();
     let mut total_entropies = Vec::<f32>::new();
@@ -40,41 +40,45 @@ fn solve<const N: usize>(
         let entropies = if i == 0 {
             initial_entropies.clone()
         } else {
-            calculate_entropies(&words, &answers)
+            calculate_entropies(dictionary, &answers)
         };
 
         let mut scores = entropies
             .into_iter()
-            .map(|(g, (entropy, guess_hints))| {
-                let prob = if answers.contains(&g) {
+            .map(|entropies_data| {
+                let prob = if answers.contains(&entropies_data.word) {
                     1. / (answers.len() as f32)
                 } else {
                     0.
                 };
 
                 // the less the better
-                let left_diff = expected_turns(uncertainty - entropy, 0., 1.6369421, -0.029045254) * (1. - prob);
+                let left_diff = expected_turns(uncertainty - entropies_data.entropy, 0., 1.6369421, -0.029045254) * (1. - prob);
 
-                (g, (entropy, left_diff, guess_hints))
+                (entropies_data, left_diff)
             })
             .collect::<Vec<_>>();
 
-        scores.sort_by(|&(_, (_, score1, _)), &(_, (_, score2, _))| {
+        scores.sort_by(|&(_, score1), &(_, score2)| {
             score1.partial_cmp(&score2).unwrap_or(Equal)
         });
 
 
+        /*
         if print {
             for (word, (entropy, score, _)) in scores.iter().take(10) {
                 println!("{word}: {entropy} entropy, {score} score");
             }
         }
+        */
 
-        let (guess, (_, _, guess_hints)) = scores.into_iter().next().unwrap();
+        let (entropies_data, _) = scores.into_iter().next().unwrap();
+        let guess = &entropies_data.word;
+        let probabilities = &entropies_data.probabilities;
 
-        let (hints, knowledge_new) = get_hints_and_update(&guess, correct, knowledge);
+        let (hints, knowledge_new) = get_hints_and_update(guess, correct, knowledge);
 
-        let actual_entropy = -guess_hints.get(&hints).unwrap().log2();
+        let actual_entropy = -probabilities.get(&hints).unwrap().log2();
         knowledge = knowledge_new;
         answers = get_answers(words.clone(), &knowledge);
 
@@ -101,11 +105,12 @@ fn solve<const N: usize>(
     (guesses, all_hints, total_entropies, uncertainties)
 }
 
-pub fn solve_random<const N: usize>(words: &Vec<WordN<char, N>>, n: usize) -> Vec<(f32, i32)> {
+pub fn solve_random<const N: usize>(dictionary: &Dictionary<N>, n: usize) -> Vec<(f32, i32)> {
+    let words = &dictionary.words;
     let correct_words = words.iter().choose_multiple(&mut rand::thread_rng(), n);
 
     let start = Instant::now();
-    let initial_entropies = calculate_entropies(words, words);
+    let initial_entropies = calculate_entropies(dictionary, words);
     let duration = start.elapsed();
     println!("Initial entropies calculation took: {}ms", duration.as_millis());
 
@@ -114,7 +119,7 @@ pub fn solve_random<const N: usize>(words: &Vec<WordN<char, N>>, n: usize) -> Ve
 
     for correct in correct_words {
         println!("correct: {correct}");
-        let (guesses, hints, entropies, uncertainties) = solve(&initial_entropies, words, correct, false);
+        let (guesses, hints, entropies, uncertainties) = solve(&initial_entropies, dictionary, correct, false);
 
         print_vec(&guesses);
         print_vec(&hints);
