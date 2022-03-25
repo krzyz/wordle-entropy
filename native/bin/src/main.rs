@@ -6,12 +6,14 @@ use varpro::prelude::*;
 use varpro::solvers::levmar::{LevMarProblemBuilder, LevMarSolver};
 use we_core::algo;
 use we_core::data;
-use we_core::solvers::solve_random;
+use we_core::entropy::calculate_entropies;
+use we_core::solvers::{solve_random, solve};
 use we_core::structs::{KnowledgeN, WordN};
 use wordle_entropy_core as we_core;
 
 //const WORDS_PATH: &str = "/home/krzyz/projects/data/words_polish.txt";
-const WORDS_PATH: &str = "/home/krzyz/projects/data/scrabble-polish-words.txt";
+//const WORDS_PATH: &str = "/home/krzyz/projects/data/scrabble-polish-words.txt";
+const WORDS_PATH: &str = "D:/projects/data/words-scrabble-with-probs.csv";
 const WORDS_LENGTH: usize = 5;
 
 type Word = WordN<char, WORDS_LENGTH>;
@@ -78,6 +80,14 @@ pub fn print_example() {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dictionary = data::load_words::<_, WORDS_LENGTH>(WORDS_PATH).unwrap();
     let words = &dictionary.words;
+
+    /*
+    let correct = WordN::<char, 5>::new("apage");
+    let answers = (0..words.len()).collect::<Vec<_>>();
+    let initial_entropies = calculate_entropies(&dictionary, &answers);
+
+    let solved = solve(&initial_entropies, &dictionary, &correct, true);
+    */
 
     let unc_data = solve_random(&dictionary, 200)
         .into_iter()

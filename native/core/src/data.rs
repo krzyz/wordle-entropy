@@ -10,7 +10,7 @@ where
     let words_with_probs = io::BufReader::new(file)
         .lines()
         .map(|l| l.map(|l| {
-            let mut split = l.split("\t");
+            let mut split = l.split(",");
             let (word_str, probability_str) = (split.next().unwrap(), split.next().unwrap());
             (WordN::<char, N>::new(&word_str), probability_str.parse::<f64>().unwrap())
         }))
