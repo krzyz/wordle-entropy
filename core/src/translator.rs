@@ -27,6 +27,7 @@ impl Translator {
         }
     }
 
+    #[allow(dead_code)]
     pub fn to_chars<const N: usize>(&self, byte_word: &WordN<u8, N>) -> WordN<char, N> {
         let mut word = WordN::init('a');
         for (i, b) in byte_word.0.into_iter().enumerate() {
@@ -42,5 +43,4 @@ impl Translator {
         }
         byte_word
     }
-
 }
