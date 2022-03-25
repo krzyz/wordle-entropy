@@ -13,7 +13,7 @@ use yew::{
     use_node_ref, use_reducer, use_state, Callback, Html, Reducible, TargetCast, UseStateHandle,
 };
 
-fn draw_plot(canvas: HtmlCanvasElement, data: &[f32]) -> Result<(), Box<dyn std::error::Error>> {
+fn draw_plot(canvas: HtmlCanvasElement, data: &[f64]) -> Result<(), Box<dyn std::error::Error>> {
     let root = CanvasBackend::with_canvas_object(canvas)
         .unwrap()
         .into_drawing_area();
@@ -23,7 +23,7 @@ fn draw_plot(canvas: HtmlCanvasElement, data: &[f32]) -> Result<(), Box<dyn std:
 
     root.fill(&WHITE)?;
 
-    let y_max = data.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+    let y_max = data.iter().copied().fold(f64::NEG_INFINITY, f64::max);
     let y_max = if data.len() > 0 { y_max + 0.02 } else { 1.0 };
 
     let mut chart = ChartBuilder::on(&root)

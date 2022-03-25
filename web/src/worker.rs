@@ -12,7 +12,7 @@ impl Worker for WordleWorker {
     type Reach = Public<Self>;
     type Message = ();
     type Input = Dictionary<5>;
-    type Output = Vec<(EntropiesData<5>, f32)>;
+    type Output = Vec<(EntropiesData<5>, f64)>;
 
     fn create(link: WorkerLink<Self>) -> Self {
         Self { link }
@@ -25,13 +25,13 @@ impl Worker for WordleWorker {
         let answers = &dictionary.words;
         let entropies = calculate_entropies(dictionary, answers);
 
-        let uncertainty = (dictionary.words.len() as f32).log2();
+        let uncertainty = (dictionary.words.len() as f64).log2();
 
         let mut scores = entropies
             .into_iter()
             .map(|entropies_data| {
                 let prob = if answers.contains(&entropies_data.word) {
-                    1. / (answers.len() as f32)
+                    1. / (answers.len() as f64)
                 } else {
                     0.
                 };

@@ -9,7 +9,7 @@ use crate::{
     util::print_vec,
 };
 
-pub fn expected_turns(x: f32, r: f32, a: f32, b: f32) -> f32 {
+pub fn expected_turns(x: f64, r: f64, a: f64, b: f64) -> f64 {
     let x = x + 1.;
     b + a * x.powf(r) * x.ln()
 }
@@ -19,15 +19,15 @@ fn solve<const N: usize>(
     dictionary: &Dictionary<N>,
     correct: &WordN<char, N>,
     print: bool,
-) -> (Vec<WordN<char, N>>, Vec<HintsN<N>>, Vec<f32>, Vec<f32>) {
+) -> (Vec<WordN<char, N>>, Vec<HintsN<N>>, Vec<f64>, Vec<f64>) {
     let words = &dictionary.words;
     let mut answers = words.clone();
     let mut knowledge = KnowledgeN::<N>::default();
-    let mut total_entropies = Vec::<f32>::new();
-    let mut uncertainties= Vec::<f32>::new();
+    let mut total_entropies = Vec::<f64>::new();
+    let mut uncertainties= Vec::<f64>::new();
     let mut guesses = vec![];
     let mut all_hints = vec![];
-    let mut uncertainty = (words.len() as f32).log2();
+    let mut uncertainty = (words.len() as f64).log2();
 
     for i in 0.. {
         uncertainties.push(uncertainty);
@@ -47,7 +47,7 @@ fn solve<const N: usize>(
             .into_iter()
             .map(|entropies_data| {
                 let prob = if answers.contains(&entropies_data.word) {
-                    1. / (answers.len() as f32)
+                    1. / (answers.len() as f64)
                 } else {
                     0.
                 };
@@ -105,7 +105,7 @@ fn solve<const N: usize>(
     (guesses, all_hints, total_entropies, uncertainties)
 }
 
-pub fn solve_random<const N: usize>(dictionary: &Dictionary<N>, n: usize) -> Vec<(f32, i32)> {
+pub fn solve_random<const N: usize>(dictionary: &Dictionary<N>, n: usize) -> Vec<(f64, i32)> {
     let words = &dictionary.words;
     let correct_words = words.iter().choose_multiple(&mut rand::thread_rng(), n);
 
@@ -126,7 +126,7 @@ pub fn solve_random<const N: usize>(dictionary: &Dictionary<N>, n: usize) -> Vec
         println!("{entropies:?}");
         println!();
 
-        turns.push(guesses.len() as f32);
+        turns.push(guesses.len() as f64);
         let unc_points = uncertainties.iter().enumerate().map(|(i, unc)| (*unc, (guesses.len() - i) as i32)).collect::<Vec<_>>();
         unc_data.extend(unc_points);
     }

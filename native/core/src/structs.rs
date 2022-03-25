@@ -165,15 +165,15 @@ impl<const N: usize> KnowledgeN<N> {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EntropiesData<const N: usize> {
     pub word: WordN<char, N>,
-    pub entropy: f32,
-    pub probabilities: FxHashMap<HintsN<N>, f32>,
+    pub entropy: f64,
+    pub probabilities: FxHashMap<HintsN<N>, f64>,
 }
 
 impl<const N: usize> EntropiesData<N> {
     pub fn new(
         word: WordN<char, N>,
-        entropy: f32,
-        probabilities: FxHashMap<HintsN<N>, f32>,
+        entropy: f64,
+        probabilities: FxHashMap<HintsN<N>, f64>,
     ) -> Self {
         EntropiesData {
             word,
