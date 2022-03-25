@@ -183,15 +183,19 @@ impl<const N: usize> EntropiesData<N> {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Dictionary<const N: usize> {
     pub words: Vec<WordN<char, N>>,
+    pub words_bytes: Vec<WordN<u8, N>>,
+    pub probabilities: Vec<f64>,
     pub translator: Translator,
 }
 
 impl<const N: usize> Dictionary<N> {
-    pub fn new(words: Vec<WordN<char, N>>) -> Self {
+    pub fn new(words: Vec<WordN<char, N>>, probabilities: Vec<f64>) -> Self {
         let translator = Translator::generate(&words);
-        Self { words, translator }
+        let words_bytes = words.iter().map(|w| translator.to_bytes(w)).collect();
+        Self { words, words_bytes, probabilities, translator }
     }
 }

@@ -7,17 +7,33 @@ where
     P: AsRef<Path>,
 {
     let file = File::open(filename)?;
-    let words = io::BufReader::new(file)
+    let words_with_probs = io::BufReader::new(file)
         .lines()
-        .map(|l| l.map(|l| WordN::<char, N>::new(&l)))
+        .map(|l| l.map(|l| {
+            let mut split = l.split("\t");
+            let (word_str, probability_str) = (split.next().unwrap(), split.next().unwrap());
+            (WordN::<char, N>::new(&word_str), probability_str.parse::<f64>().unwrap())
+        }))
         .collect::<io::Result<Vec<_>>>()?;
+    
+    let (words, probabilities) = words_with_probs.into_iter().unzip();
 
-    Ok(Dictionary::new(words))
+    Ok(Dictionary::new(words, probabilities))
 }
 
-pub fn parse_words<'a, I, const N: usize>(lines: I) -> Vec<WordN<char, N>>
+pub fn parse_words<'a, I, const N: usize>(lines: I) -> Dictionary<N>
 where
     I: Iterator<Item = &'a str>,
 {
-    lines.map(|l| WordN::<char, N>::new(&l)).collect()
+    let words_with_probs = lines
+        .map(|l| {
+            let mut split = l.split(",");
+            let (word_str, probability_str) = (split.next().unwrap(), split.next().unwrap());
+            (WordN::<char, N>::new(&word_str), probability_str.parse::<f64>().unwrap())
+        })
+        .collect::<Vec<_>>();
+    
+    let (words, probabilities) = words_with_probs.into_iter().unzip();
+
+    Dictionary::new(words, probabilities)
 }

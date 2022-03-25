@@ -153,10 +153,12 @@ pub fn check<const N: usize>(word: &WordN<char, N>, knowledge: &KnowledgeN<N>) -
 pub fn get_answers<const N: usize>(
     words: Vec<WordN<char, N>>,
     knowledge: &KnowledgeN<N>,
-) -> Vec<WordN<char, N>> {
+) -> Vec<usize> {
     words
         .into_iter()
-        .filter(|word| check(word, knowledge))
+        .enumerate()
+        .filter(|(_, word)| check(word, knowledge))
+        .map(|(i, _)| i)
         .collect()
 }
 

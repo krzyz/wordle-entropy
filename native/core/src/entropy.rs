@@ -6,7 +6,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
     algo,
-    structs::{WordN, EntropiesData, Dictionary},
+    structs::{EntropiesData, Dictionary},
 };
 
 pub fn entropy(arr: Array1<f64>) -> f64 {
@@ -28,35 +28,32 @@ pub fn entropy(arr: Array1<f64>) -> f64 {
 
 pub fn calculate_entropies<const N: usize>(
     dictionary: &Dictionary<N>,
-    possible_answers: &Vec<WordN<char, N>>,
+    possible_answers: &[usize],
 ) -> Vec<EntropiesData<N>> {
-    let n = possible_answers.len() as f64;
-
-    let guess_words = &dictionary.words;
+    let prob_norm: f64 = possible_answers.iter().map(|&i| dictionary.probabilities[i]).sum();
+    let guess_words_bytes = &dictionary.words_bytes;
     let trans = &dictionary.translator;
 
-    let possible_answers: Vec<_> = possible_answers.iter().map(|w| trans.to_bytes(w)).collect();
-
     #[cfg(feature = "parallel")]
-    let guess_words_iter = guess_words.par_iter();
+    let guess_words_iter = guess_words_bytes.par_iter();
 
     #[cfg(not(feature = "parallel"))]
-    let guess_words_iter = guess_words.iter();
+    let guess_words_iter = guess_words_bytes.iter();
 
     let entropies = guess_words_iter
-        .map(|guess| {
-            let guess_b = trans.to_bytes(guess);
+        .map(|guess_b| {
             let mut guess_hints = FxHashMap::<_, f64>::default();
-            for correct in possible_answers.iter() {
+            for (correct, probability) in possible_answers.iter().map(|&i| (&dictionary.words_bytes[i], &dictionary.probabilities[i])) {
                 let mut left = ArrayVec::<_, N>::new();
                 let hints = algo::get_hints_with_work_array(&guess_b, correct, &mut left);
-                *guess_hints.entry(hints).or_default() += 1. / n;
+                *guess_hints.entry(hints).or_default() += *probability / prob_norm;
             }
 
             let probs = Array1::<f64>::from_vec(
                 guess_hints.values().map(|x| *x as f64).collect::<Vec<_>>(),
             );
             let entropy = entropy(probs);
+            let guess = trans.to_chars(guess_b);
 
             EntropiesData::new(guess.clone(), entropy, guess_hints)
         })

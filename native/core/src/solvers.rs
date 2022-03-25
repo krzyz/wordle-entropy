@@ -21,7 +21,7 @@ fn solve<const N: usize>(
     print: bool,
 ) -> (Vec<WordN<char, N>>, Vec<HintsN<N>>, Vec<f64>, Vec<f64>) {
     let words = &dictionary.words;
-    let mut answers = words.clone();
+    let mut answers = (0..words.len()).collect::<Vec<_>>();
     let mut knowledge = KnowledgeN::<N>::default();
     let mut total_entropies = Vec::<f64>::new();
     let mut uncertainties= Vec::<f64>::new();
@@ -33,7 +33,7 @@ fn solve<const N: usize>(
         uncertainties.push(uncertainty);
         if answers.len() == 1 {
             total_entropies.push(total_entropies.last().copied().unwrap_or_default());
-            guesses.push(answers.first().unwrap().clone());
+            guesses.push(dictionary.words[*answers.first().unwrap()].clone());
             all_hints.push(HintsN::<N>::correct());
             break;
         }
@@ -42,12 +42,15 @@ fn solve<const N: usize>(
         } else {
             calculate_entropies(dictionary, &answers)
         };
+        
+        let prob_norm: f64 = answers.iter().map(|&i| dictionary.probabilities[i]).sum();
 
         let mut scores = entropies
             .into_iter()
-            .map(|entropies_data| {
-                let prob = if answers.contains(&entropies_data.word) {
-                    1. / (answers.len() as f64)
+            .enumerate()
+            .map(|(i, entropies_data)| {
+                let prob = if answers.contains(&i) {
+                    dictionary.probabilities[i] / prob_norm
                 } else {
                     0.
                 };
@@ -107,10 +110,11 @@ fn solve<const N: usize>(
 
 pub fn solve_random<const N: usize>(dictionary: &Dictionary<N>, n: usize) -> Vec<(f64, i32)> {
     let words = &dictionary.words;
+    let answers = (0..words.len()).collect::<Vec<_>>();
     let correct_words = words.iter().choose_multiple(&mut rand::thread_rng(), n);
 
     let start = Instant::now();
-    let initial_entropies = calculate_entropies(dictionary, words);
+    let initial_entropies = calculate_entropies(dictionary, &answers);
     let duration = start.elapsed();
     println!("Initial entropies calculation took: {}ms", duration.as_millis());
 

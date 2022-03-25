@@ -22,23 +22,24 @@ impl Worker for WordleWorker {
 
     fn handle_input(&mut self, msg: Self::Input, id: HandlerId) {
         let dictionary = &msg;
-        let answers = &dictionary.words;
-        let entropies = calculate_entropies(dictionary, answers);
+        let answers = (0..dictionary.words.len()).collect::<Vec<_>>();
+        let entropies = calculate_entropies(dictionary, &answers);
 
         let uncertainty = (dictionary.words.len() as f64).log2();
+        let prob_norm: f64 = answers.iter().map(|&i| dictionary.probabilities[i]).sum();
 
         let mut scores = entropies
             .into_iter()
-            .map(|entropies_data| {
-                let prob = if answers.contains(&entropies_data.word) {
-                    1. / (answers.len() as f64)
+            .enumerate()
+            .map(|(i, entropies_data)| {
+                let prob = if answers.contains(&i) {
+                    dictionary.probabilities[i] / prob_norm
                 } else {
                     0.
                 };
 
                 // the less the better
-                let left_diff = expected_turns(uncertainty - entropies_data.entropy, 0., 1.6369421, -0.029045254)
-                    * (1. - prob);
+                let left_diff = expected_turns(uncertainty - entropies_data.entropy, 0., 1.6369421, -0.029045254) * (1. - prob);
 
                 (entropies_data, left_diff)
             })

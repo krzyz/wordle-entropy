@@ -84,7 +84,7 @@ impl Default for WordsState {
             perf_end: None,
             running: false,
             entropies: WorkerOutput::new().into(),
-            dictionary: Dictionary::new(vec![]).into(),
+            dictionary: Dictionary::new(vec![], vec![]).into(),
         }
     }
 }
@@ -203,10 +203,10 @@ pub fn app() -> Html {
                 if let Some(file) = files.first() {
                     *file_reader.borrow_mut() = Some(read_as_text(&file, move |res| match res {
                         Ok(content) => {
-                            let words = parse_words::<_, 5>(
+                            let dictionary = parse_words::<_, 5>(
                                 content.lines(),
                             );
-                            word_state.dispatch(WordsAction::LoadWords(Dictionary::new(words)));
+                            word_state.dispatch(WordsAction::LoadWords(dictionary));
                         }
                         Err(err) => {
                             log::info!("Reading file error: {err}");
