@@ -1,10 +1,10 @@
-
 #![recursion_limit = "1024"]
 #![allow(clippy::large_enum_variant)]
 
 pub mod main_app;
-mod worker;
 mod pages;
+mod word_set;
+mod worker;
 
 use gloo_worker::PublicWorker;
 use wasm_bindgen::prelude::*;

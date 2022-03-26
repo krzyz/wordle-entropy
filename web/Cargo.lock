@@ -1493,6 +1493,7 @@ name = "wordle-entropy-web"
 version = "0.1.0"
 dependencies = [
  "gloo-file 0.2.1 (git+https://github.com/krzyz/gloo)",
+ "gloo-storage",
  "gloo-timers 0.2.3 (git+https://github.com/krzyz/gloo)",
  "gloo-worker",
  "hsl",
