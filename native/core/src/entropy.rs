@@ -50,7 +50,7 @@ pub fn calculate_entropies<const N: usize>(
             }
 
             let probs = Array1::<f64>::from_vec(
-                guess_hints.values().map(|x| *x as f64).collect::<Vec<_>>(),
+                guess_hints.values().copied().collect::<Vec<_>>(),
             );
             let entropy = entropy(probs);
             let guess = trans.to_chars(guess_b);

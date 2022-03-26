@@ -2,8 +2,9 @@
 #![recursion_limit = "1024"]
 #![allow(clippy::large_enum_variant)]
 
-pub mod app;
+pub mod main_app;
 mod worker;
+mod pages;
 
 use gloo_worker::PublicWorker;
 use wasm_bindgen::prelude::*;
@@ -17,7 +18,7 @@ pub fn start() {
     // check if we are the main/UI thread
     if Reflect::has(&global(), &JsValue::from_str("window")).unwrap() {
         wasm_logger::init(wasm_logger::Config::default());
-        yew::start_app::<app::App>();
+        yew::start_app::<main_app::MainApp>();
     } else {
         <worker::WordleWorker as PublicWorker>::register();
     }

@@ -66,15 +66,6 @@ pub fn solve<const N: usize>(
             score1.partial_cmp(&score2).unwrap_or(Equal)
         });
 
-
-        /*
-        if print {
-            for (word, (entropy, score, _)) in scores.iter().take(10) {
-                println!("{word}: {entropy} entropy, {score} score");
-            }
-        }
-        */
-
         if print {
             println!("Prob norm: {prob_norm}");
             println!("10 best gueses:");

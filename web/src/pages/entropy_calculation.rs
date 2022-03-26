@@ -121,7 +121,7 @@ impl Reducible for WordsState {
     }
 }
 
-#[function_component(App)]
+#[function_component(EntropyCalculation)]
 pub fn app() -> Html {
     let word_state = use_reducer(WordsState::default);
     let file_input_node_ref = use_node_ref();
@@ -229,57 +229,55 @@ pub fn app() -> Html {
     };
 
     html! {
-        <main>
-            <div class="container">
-                <div class="columns">
-                    <div class="column col-6 col-mx-auto">
-                        <form onsubmit={onload}>
-                            <input class="btn" ref={file_input_node_ref} type="file"/>
-                            <button class="btn btn-primary">{"Load words"}</button>
-                        </form>
-                        <button class="btn btn-primary" disabled={word_state.running} onclick={onclick_run}>{"Run"}</button>
-                        {
-                            if word_state.running {
-                                html!(<div class="d-inline-block loading p-2"></div>)
-                            } else {
-                                html!()
-                            }
+        <div class="container">
+            <div class="columns">
+                <div class="column col-6 col-mx-auto">
+                    <form onsubmit={onload}>
+                        <input class="btn" ref={file_input_node_ref} type="file"/>
+                        <button class="btn btn-primary">{"Load words"}</button>
+                    </form>
+                    <button class="btn btn-primary" disabled={word_state.running} onclick={onclick_run}>{"Run"}</button>
+                    {
+                        if word_state.running {
+                            html!(<div class="d-inline-block loading p-2"></div>)
+                        } else {
+                            html!()
                         }
-                    </div>
-                </div>
-                <div class="columns">
-                    <div class="column">
-                        <canvas ref={canvas_node_ref} id="canvas" width="800" height="400"></canvas>
-                        if let (Some(perf_start), Some(perf_end)) = (word_state.perf_start, word_state.perf_end) {
-                            <p> { format!("{:.3} ms", perf_end - perf_start) } </p>
-                        }
-                    </div>
-                    <div class="column">
-                        <label for="max_words_shown_input">{"Max words shown:"}</label>
-                        <input id="max_words_shown_input" onchange={on_max_words_shown_change} value={(*max_words_shown).to_string()}/>
-                        <ul class="words_entropies_list">
-                            {
-                                word_state.entropies.iter().take(*max_words_shown).map(|(entropy_data, left_turns)| {
-                                    let word = &entropy_data.word;
-                                    let entropy = &entropy_data.entropy;
-                                    html! {
-                                        <li
-                                            key={format!("{word}")}
-                                            class={classes!(
-                                                "c-hand",
-                                                (*selected_word).clone().map(|selected_word| { *word == selected_word }).map(|is_selected| is_selected.then(|| Some("text-primary")))
-                                            )}
-                                            onclick={onclick_word(word.clone(), selected_word.clone())}
-                                        >
-                                            {format!("{word}: {entropy}, {left_turns}")}
-                                        </li>
-                                    }
-                                }).collect::<Html>()
-                            }
-                        </ul>
-                    </div>
+                    }
                 </div>
             </div>
-        </main>
+            <div class="columns">
+                <div class="column">
+                    <canvas ref={canvas_node_ref} id="canvas" width="800" height="400"></canvas>
+                    if let (Some(perf_start), Some(perf_end)) = (word_state.perf_start, word_state.perf_end) {
+                        <p> { format!("{:.3} ms", perf_end - perf_start) } </p>
+                    }
+                </div>
+                <div class="column">
+                    <label for="max_words_shown_input">{"Max words shown:"}</label>
+                    <input id="max_words_shown_input" onchange={on_max_words_shown_change} value={(*max_words_shown).to_string()}/>
+                    <ul class="words_entropies_list">
+                        {
+                            word_state.entropies.iter().take(*max_words_shown).map(|(entropy_data, left_turns)| {
+                                let word = &entropy_data.word;
+                                let entropy = &entropy_data.entropy;
+                                html! {
+                                    <li
+                                        key={format!("{word}")}
+                                        class={classes!(
+                                            "c-hand",
+                                            (*selected_word).clone().map(|selected_word| { *word == selected_word }).map(|is_selected| is_selected.then(|| Some("text-primary")))
+                                        )}
+                                        onclick={onclick_word(word.clone(), selected_word.clone())}
+                                    >
+                                        {format!("{word}: {entropy}, {left_turns}")}
+                                    </li>
+                                }
+                            }).collect::<Html>()
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
     }
 }
