@@ -2,7 +2,7 @@ use crate::pages::{
     entropy_calculation::EntropyCalculation, page_not_found::PageNotFound, simulation::Simulation,
     solver::Solver, word_sets::WordSets,
 };
-use crate::word_set::{WordSetVec, WordSet};
+use crate::word_set::{WordSet, WordSetVec};
 use bounce::{use_atom, BounceRoot, CloneAtom};
 use reqwest::StatusCode;
 use wasm_bindgen_futures::spawn_local;
@@ -34,33 +34,36 @@ pub fn word_set_select() -> Html {
 
     {
         let word_sets = word_sets.clone();
-        if word_sets.0.len() == 0 {
-            use_effect_with_deps(
-                move |_| {
+        use_effect_with_deps(
+            move |_| {
+                if word_sets.0.len() == 0 {
                     spawn_local(async move {
                         let client = reqwest::Client::new();
                         let response = client
-                                .get("https://wordle.realcomplexity.com/data/words-scrabblr-with_probs.csv")
+                                .get("https://wordle.realcomplexity.com/data/words-scrabble-with_probs.csv")
                                 .send()
                                 .await.unwrap();
 
                         match response.status() {
                             StatusCode::OK => {
                                 let text = response.text().await.unwrap();
-                                log::info!("{}", text.clone());
                                 let dictionary = parse_words::<_, 5>(text.lines());
-                                word_sets.set((*word_sets).extend_with(WordSet::from_dictionary(0, "Polish words scrabble".to_string(), dictionary)));
-
+                                word_sets.set((*word_sets).extend_with(WordSet::from_dictionary(
+                                    0,
+                                    "Polish words scrabble".to_string(),
+                                    dictionary,
+                                )));
+                                log::info!("Loaded from url");
                             }
                             _ => log::info!("Error loading csv"),
                         }
                     });
-                    || ()
-                },
-                (),
-            );
-        } else {
-        }
+                } else {
+                }
+                || ()
+            },
+            (),
+        );
     }
 
     html! {
