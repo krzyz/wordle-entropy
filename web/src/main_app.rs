@@ -3,9 +3,11 @@ use crate::pages::{
     solver::Solver, word_sets::WordSets,
 };
 use crate::word_set::{WordSetVec, WordSet};
-use std::cell::RefCell;
-use std::rc::Rc;
-use yew::{function_component, html, use_state, ContextProvider, Html};
+use bounce::{use_atom, BounceRoot, CloneAtom};
+use reqwest::StatusCode;
+use wasm_bindgen_futures::spawn_local;
+use wordle_entropy_core::data::parse_words;
+use yew::{function_component, html, use_effect_with_deps, Html};
 use yew_router::components::Link;
 use yew_router::{BrowserRouter, Routable, Switch};
 
@@ -26,16 +28,60 @@ pub enum Route {
     NotFound,
 }
 
-pub fn get_initial_word_sets() -> WordSetVec {
-    vec![Rc::new(RefCell::new(WordSet::new(0, "Default Polish".to_string())))]
+#[function_component(WordSetSelect)]
+pub fn word_set_select() -> Html {
+    let word_sets = use_atom::<WordSetVec>();
+
+    {
+        let word_sets = word_sets.clone();
+        if word_sets.0.len() == 0 {
+            use_effect_with_deps(
+                move |_| {
+                    spawn_local(async move {
+                        let client = reqwest::Client::new();
+                        let response = client
+                                .get("https://wordle.realcomplexity.com/data/words-scrabblr-with_probs.csv")
+                                .send()
+                                .await.unwrap();
+
+                        match response.status() {
+                            StatusCode::OK => {
+                                let text = response.text().await.unwrap();
+                                log::info!("{}", text.clone());
+                                let dictionary = parse_words::<_, 5>(text.lines());
+                                word_sets.set((*word_sets).extend_with(WordSet::from_dictionary(0, "Polish words scrabble".to_string(), dictionary)));
+
+                            }
+                            _ => log::info!("Error loading csv"),
+                        }
+                    });
+                    || ()
+                },
+                (),
+            );
+        } else {
+        }
+    }
+
+    html! {
+        <select name="word_sets">
+            {
+                word_sets.0.iter().map(|word_set| {
+                    let name = word_set.borrow().name.clone();
+                    html! {
+                        <option value={name.clone()}> {name} </option>
+                    }
+                }).collect::<Html>()
+            }
+        </select>
+
+    }
 }
 
 #[function_component(MainApp)]
 pub fn view() -> Html {
-    let word_sets_ctx = use_state(get_initial_word_sets);
-
     html! {
-        <ContextProvider<WordSetVec> context={(*word_sets_ctx).clone()}>
+        <BounceRoot>
             <BrowserRouter>
                 <nav class="navbar">
                     <section class="navbar-section">
@@ -53,23 +99,14 @@ pub fn view() -> Html {
                         </Link<Route>>
                     </section>
                     <section>
-                        <select name="word_sets">
-                            {
-                                word_sets_ctx.iter().map(|word_set| {
-                                    let name = word_set.borrow().name.clone();
-                                    html! {
-                                        <option value={name.clone()}> {name} </option>
-                                    }
-                                }).collect::<Html>()
-                            }
-                        </select>
+                        <WordSetSelect />
                     </section>
                 </nav>
                 <main>
                     <Switch<Route> render={Switch::render(switch)} />
                 </main>
             </BrowserRouter>
-        </ContextProvider<WordSetVec>>
+        </BounceRoot>
     }
 }
 
