@@ -3,11 +3,13 @@ use crate::pages::{
     solver::Solver, word_sets::WordSets,
 };
 use crate::word_set::{WordSet, WordSetVec};
-use bounce::{use_atom, BounceRoot, CloneAtom};
+use bounce::{use_atom, BounceRoot, Atom};
 use reqwest::StatusCode;
 use wasm_bindgen_futures::spawn_local;
+use web_sys::HtmlInputElement;
 use wordle_entropy_core::data::parse_words;
-use yew::{function_component, html, use_effect_with_deps, Html};
+use yew::events::Event;
+use yew::{function_component, html, use_effect_with_deps, Html, Callback, TargetCast};
 use yew_router::components::Link;
 use yew_router::{BrowserRouter, Routable, Switch};
 
@@ -28,9 +30,13 @@ pub enum Route {
     NotFound,
 }
 
+#[derive(Default, PartialEq, Atom)]
+pub struct WordSetSelection(pub Option<String>);
+
 #[function_component(WordSetSelect)]
 pub fn word_set_select() -> Html {
     let word_sets = use_atom::<WordSetVec>();
+    let selected = use_atom::<WordSetSelection>();
 
     {
         let word_sets = word_sets.clone();
@@ -66,13 +72,22 @@ pub fn word_set_select() -> Html {
         );
     }
 
+    let onchange = || {
+        let selected = use_atom::<WordSetSelection>();
+        Callback::from(move |e: Event| {
+            let select: HtmlInputElement = e.target_unchecked_into();
+            selected.set(WordSetSelection(Some(select.value().clone())));
+        })
+    };
+
     html! {
         <select name="word_sets">
             {
                 word_sets.0.iter().map(|word_set| {
                     let name = word_set.borrow().name.clone();
+                    let name_optional = Some(name.clone());
                     html! {
-                        <option value={name.clone()}> {name} </option>
+                        <option value={name.clone()} onchange={onchange()} selected={selected.0 == name_optional }> {name} </option>
                     }
                 }).collect::<Html>()
             }
