@@ -1,4 +1,7 @@
+use crate::main_app::WordSetSelection;
+use crate::word_set::WordSetVec;
 use crate::worker::WordleWorker;
+use bounce::use_atom;
 use gloo_file::callbacks::read_as_text;
 use gloo_worker::{Bridged, Worker};
 use plotters::prelude::*;
@@ -167,14 +170,30 @@ pub fn app() -> Html {
         )
     }
 
+
+    let word_sets = use_atom::<WordSetVec>();
+    let selected = use_atom::<WordSetSelection>();
+
     let worker = use_mut_ref(|| WordleWorker::bridge(Rc::new(cb)));
 
     let onclick_run = {
         let word_state = word_state.clone();
+        let word_sets = word_sets.clone();
+        let selected = selected.clone();
         let worker = worker.clone();
         Callback::from(move |_| {
-            worker.borrow_mut().send((*word_state.dictionary).clone());
-            word_state.dispatch(WordsAction::StartCalc);
+            log::info!("run");
+            let dictionary = if let Some(word_set) = word_sets.0.iter().find(|word_set| Some(word_set.borrow().name.clone()) == selected.0) {
+                log::info!("found word_set");
+                word_set.borrow().dictionary.clone()
+            } else {
+                None
+            };
+            if let Some(dictionary) = dictionary {
+                log::info!("found dictionary"); 
+                worker.borrow_mut().send(dictionary);
+                word_state.dispatch(WordsAction::StartCalc);
+            }
         })
     };
 

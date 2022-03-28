@@ -3,13 +3,13 @@ use crate::pages::{
     solver::Solver, word_sets::WordSets,
 };
 use crate::word_set::{WordSet, WordSetVec};
-use bounce::{use_atom, BounceRoot, Atom};
+use bounce::{use_atom, Atom, BounceRoot};
 use reqwest::StatusCode;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
 use wordle_entropy_core::data::parse_words;
 use yew::events::Event;
-use yew::{function_component, html, use_effect_with_deps, Html, Callback, TargetCast};
+use yew::{function_component, html, use_effect_with_deps, Callback, Html, TargetCast};
 use yew_router::components::Link;
 use yew_router::{BrowserRouter, Routable, Switch};
 
@@ -79,6 +79,12 @@ pub fn word_set_select() -> Html {
             selected.set(WordSetSelection(Some(select.value().clone())));
         })
     };
+
+    if word_sets.0.len() > 0 && *selected == WordSetSelection(None) {
+        selected.set(WordSetSelection(Some(
+            word_sets.0.iter().next().unwrap().borrow().name.clone(),
+        )));
+    }
 
     html! {
         <select name="word_sets">
