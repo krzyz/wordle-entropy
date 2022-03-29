@@ -2,8 +2,8 @@ use crate::pages::{
     entropy_calculation::EntropyCalculation, page_not_found::PageNotFound, simulation::Simulation,
     solver::Solver, word_sets::WordSets,
 };
-use crate::word_set::{WordSet, WordSetVec};
-use bounce::{use_atom, Atom, BounceRoot};
+use crate::word_set::{WordSet, WordSetVec, WordSetVecAction};
+use bounce::{use_atom, Atom, BounceRoot, use_slice};
 use reqwest::StatusCode;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
@@ -35,7 +35,7 @@ pub struct WordSetSelection(pub Option<String>);
 
 #[function_component(WordSetSelect)]
 pub fn word_set_select() -> Html {
-    let word_sets = use_atom::<WordSetVec>();
+    let word_sets = use_slice::<WordSetVec>();
     let selected = use_atom::<WordSetSelection>();
 
     {
@@ -54,10 +54,10 @@ pub fn word_set_select() -> Html {
                             StatusCode::OK => {
                                 let text = response.text().await.unwrap();
                                 let dictionary = parse_words::<_, 5>(text.lines());
-                                word_sets.set((*word_sets).extend_with(WordSet::from_dictionary(
+                                word_sets.dispatch(WordSetVecAction::Set((*word_sets).extend_with(WordSet::from_dictionary(
                                     "Polish words scrabble".to_string(),
                                     dictionary,
-                                )));
+                                ))));
                                 log::info!("Loaded from url");
                             }
                             _ => log::info!("Error loading csv"),

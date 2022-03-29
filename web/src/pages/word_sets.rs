@@ -1,11 +1,65 @@
-use crate::{word_set::WordSetVec, main_app::Route};
-use bounce::use_atom;
-use yew::{function_component, html, Html};
+use crate::{word_set::{WordSetVec, WordSetVecAction}, main_app::Route};
+use bounce::{use_slice_dispatch, use_slice};
+use gloo_file::callbacks::read_as_text;
+use web_sys::HtmlInputElement;
+use wordle_entropy_core::data::parse_words;
+use yew::{function_component, html, Html, use_node_ref, Callback, FocusEvent, use_mut_ref};
 use yew_router::components::Link;
+
+#[function_component(AddWordSetForm)]
+pub fn form() -> Html {
+    let dispatch_word_set = use_slice_dispatch::<WordSetVec>();
+    let file_input_node_ref = use_node_ref();
+    let name_input_node_ref = use_node_ref();
+    let file_reader = use_mut_ref(|| None);
+
+    let onload = {
+        let file_reader = file_reader.clone();
+        let file_input_node_ref = file_input_node_ref.clone();
+        let name_input_node_ref = name_input_node_ref.clone();
+        let dispatch_word_set = dispatch_word_set.clone();
+
+        Callback::from(move |e: FocusEvent| {
+            let dispatch_word_set = dispatch_word_set.clone();
+            e.prevent_default();
+            let name_input = name_input_node_ref.cast::<HtmlInputElement>().unwrap();
+            let name = name_input.value();
+            let file_input = file_input_node_ref.cast::<HtmlInputElement>().unwrap();
+            let files = file_input
+                .files()
+                .map(|files| gloo_file::FileList::from(files));
+
+            if let Some(files) = files {
+                if let Some(file) = files.first() {
+                    *file_reader.borrow_mut() = Some(read_as_text(&file, move |res| match res {
+                        Ok(content) => {
+                            let dictionary = parse_words::<_, 5>(
+                                content.lines(),
+                            );
+                            dispatch_word_set(WordSetVecAction::LoadWords(name, dictionary));
+                        }
+                        Err(err) => {
+                            log::info!("Reading file error: {err}");
+                        }
+                    }));
+                }
+            }
+        })
+    };
+
+    html! {
+        <form onsubmit={onload}>
+            <label for="name_input">{ "Name" }</label>
+            <input id="name_input" ref={name_input_node_ref} />
+            <input class="btn" ref={file_input_node_ref} type="file"/>
+            <button class="btn btn-primary">{"Add new words"}</button>
+        </form>
+    }
+}
 
 #[function_component(WordSets)]
 pub fn view() -> Html {
-    let word_sets = use_atom::<WordSetVec>();
+    let word_sets = use_slice::<WordSetVec>();
     html! {
         <container>
             <h1>
@@ -35,7 +89,7 @@ pub fn view() -> Html {
                                             html! {
                                                 <>
                                                     <span> {"Unloaded"} </span>
-                                                    <Link<Route> to={Route::EntropyCalculation { name }} classes="btn">{"Generate"}</Link<Route>>
+                                                    <Link<Route> to={Route::EntropyCalculation { name }} >{"Generate"}</Link<Route>>
                                                 </>
                                             }
                                         }
@@ -46,6 +100,7 @@ pub fn view() -> Html {
                     }
                 </tbody>
             </table>
+
         </container>
     }
 }

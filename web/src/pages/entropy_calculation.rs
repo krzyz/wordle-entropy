@@ -1,16 +1,14 @@
 use crate::main_app::WordSetSelection;
-use crate::word_set::WordSetVec;
+use crate::word_set::{WordSetVec, WordSetVecAction};
 use crate::worker::WordleWorker;
-use bounce::use_atom;
-use gloo_file::callbacks::read_as_text;
+use bounce::{use_atom, use_slice};
 use gloo_worker::{Bridged, Worker};
 use plotters::prelude::*;
 use plotters_canvas::CanvasBackend;
 use yew::Properties;
 use std::cmp::Ordering::Equal;
 use std::rc::Rc;
-use web_sys::{FocusEvent, HtmlCanvasElement, HtmlInputElement, Performance};
-use wordle_entropy_core::{data::parse_words, structs::Dictionary};
+use web_sys::{HtmlCanvasElement, HtmlInputElement, Performance};
 use wordle_entropy_core::structs::WordN;
 use yew::{
     classes, events::Event, function_component, html, use_effect_with_deps, use_mut_ref,
@@ -56,13 +54,9 @@ fn draw_plot(canvas: HtmlCanvasElement, data: &[f64]) -> Result<(), Box<dyn std:
     Ok(())
 }
 
-type WorkerOutput = <WordleWorker as Worker>::Output;
-type Entropies = Rc<WorkerOutput>;
-
 enum WordsAction {
-    LoadWords(Dictionary<5>),
     StartCalc,
-    EndCalc(<WordleWorker as Worker>::Output),
+    EndCalc,
 }
 
 #[derive(PartialEq)]
@@ -71,8 +65,6 @@ struct WordsState {
     perf_start: Option<f64>,
     perf_end: Option<f64>,
     running: bool,
-    entropies: Entropies,
-    dictionary: Rc<Dictionary<5>>,
 }
 
 impl Default for WordsState {
@@ -87,8 +79,6 @@ impl Default for WordsState {
             perf_start: None,
             perf_end: None,
             running: false,
-            entropies: WorkerOutput::new().into(),
-            dictionary: Dictionary::new(vec![], vec![]).into(),
         }
     }
 }
@@ -98,27 +88,18 @@ impl Reducible for WordsState {
 
     fn reduce(self: Rc<Self>, action: Self::Action) -> Rc<Self> {
         match action {
-            WordsAction::LoadWords(dictionary) => {
-                let mut new_state = Self::default();
-                new_state.dictionary = Rc::new(dictionary);
-                new_state.into()
-            }
             WordsAction::StartCalc => Self {
                 performance: self.performance.clone(),
                 perf_start: Some(self.performance.now()),
                 perf_end: None,
                 running: true,
-                entropies: WorkerOutput::new().into(),
-                dictionary: self.dictionary.clone(),
             }
             .into(),
-            WordsAction::EndCalc(output) => Self {
+            WordsAction::EndCalc => Self {
                 performance: self.performance.clone(),
                 perf_start: self.perf_start,
                 perf_end: Some(self.performance.now()),
                 running: false,
-                entropies: output.into(),
-                dictionary: self.dictionary.clone(),
             }
             .into(),
         }
@@ -132,45 +113,60 @@ pub struct Props {
 
 #[function_component(EntropyCalculation)]
 pub fn app(props: &Props) -> Html {
-    let word_sets = use_atom::<WordSetVec>();
+    let word_sets = use_slice::<WordSetVec>();
     let selected = use_atom::<WordSetSelection>();
     if props.name != "" {
         selected.set(WordSetSelection(Some(props.name.clone())))
     }
 
     let word_state = use_reducer(WordsState::default);
-    let file_input_node_ref = use_node_ref();
     let canvas_node_ref = use_node_ref();
-    let file_reader = use_mut_ref(|| None);
     let selected_word = use_state(|| -> Option<WordN<char, 5>> { None });
 
     let cb = {
         let word_state = word_state.clone();
         let selected_word = selected_word.clone();
+        let selected = selected.clone();
+        let word_sets = word_sets.clone();
         move |output: <WordleWorker as Worker>::Output| {
             if let Some((entropies_data, _)) = output.iter().next() {
                 selected_word.set(Some(entropies_data.word.clone()));
             }
-            word_state.dispatch(WordsAction::EndCalc(output))
+
+            word_sets.dispatch(WordSetVecAction::SetEntropy(selected.0.as_ref().unwrap().clone(), output));
+            word_state.dispatch(WordsAction::EndCalc);
         }
     };
 
     {
         let canvas_node_ref = canvas_node_ref.clone();
         let word_state = word_state.clone();
+        let word_sets= word_sets.clone();
         let selected_word = selected_word.clone();
+        let selected = selected.clone();
         use_effect_with_deps(
-            move |(word_state, selected_word)| {
+            move |(_, selected_word)| {
                 let canvas = canvas_node_ref.cast::<HtmlCanvasElement>().unwrap();
+                let word_sets= word_sets.clone();
 
                 let data = selected_word
                     .as_ref()
                     .map(|selected_word| {
-                        let word_entropy = word_state
-                            .entropies
-                            .iter()
-                            .find(|&(entropies_data, _)| &entropies_data.word == selected_word);
-                        word_entropy.map(|(entropies_data, _)| entropies_data.probabilities.values().map(|&x| x).collect::<Vec<_>>())
+                        let word_sets = word_sets.clone();
+                        let word_entropy = if let Some(ref word_set) = word_sets.0.iter().find(|word_set| &word_set.borrow().name == selected.0.as_ref().unwrap()) {
+                            let word_set = word_set.clone();
+                            if let Some(entropies) = word_set.borrow().entropies.clone() {
+                                entropies
+                                    .iter()
+                                    .find(|&(entropies_data, _)| &entropies_data.word == selected_word)
+                                    .cloned()
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        };
+                        word_entropy.map(|(entropies_data, _)| entropies_data.probabilities.into_values().collect::<Vec<_>>())
                     })
                     .flatten()
                     .unwrap_or(vec![]);
@@ -214,36 +210,9 @@ pub fn app(props: &Props) -> Html {
         }
     };
 
-    let onload = {
-        let word_state = word_state.clone();
-        let file_reader = file_reader.clone();
-        let file_input_node_ref = file_input_node_ref.clone();
+    /*
 
-        Callback::from(move |e: FocusEvent| {
-            let word_state = word_state.clone();
-            e.prevent_default();
-            let file_input = file_input_node_ref.cast::<HtmlInputElement>().unwrap();
-            let files = file_input
-                .files()
-                .map(|files| gloo_file::FileList::from(files));
-
-            if let Some(files) = files {
-                if let Some(file) = files.first() {
-                    *file_reader.borrow_mut() = Some(read_as_text(&file, move |res| match res {
-                        Ok(content) => {
-                            let dictionary = parse_words::<_, 5>(
-                                content.lines(),
-                            );
-                            word_state.dispatch(WordsAction::LoadWords(dictionary));
-                        }
-                        Err(err) => {
-                            log::info!("Reading file error: {err}");
-                        }
-                    }));
-                }
-            }
-        })
-    };
+    */
 
     let max_words_shown = use_state(|| 10);
     let on_max_words_shown_change = {
@@ -260,10 +229,6 @@ pub fn app(props: &Props) -> Html {
         <div class="container">
             <div class="columns">
                 <div class="column col-6 col-mx-auto">
-                    <form onsubmit={onload}>
-                        <input class="btn" ref={file_input_node_ref} type="file"/>
-                        <button class="btn btn-primary">{"Load words"}</button>
-                    </form>
                     <button class="btn btn-primary" disabled={word_state.running} onclick={onclick_run}>{"Run"}</button>
                     {
                         if word_state.running {
@@ -286,22 +251,31 @@ pub fn app(props: &Props) -> Html {
                     <input id="max_words_shown_input" onchange={on_max_words_shown_change} value={(*max_words_shown).to_string()}/>
                     <ul class="words_entropies_list">
                         {
-                            word_state.entropies.iter().take(*max_words_shown).map(|(entropy_data, left_turns)| {
-                                let word = &entropy_data.word;
-                                let entropy = &entropy_data.entropy;
-                                html! {
-                                    <li
-                                        key={format!("{word}")}
-                                        class={classes!(
-                                            "c-hand",
-                                            (*selected_word).clone().map(|selected_word| { *word == selected_word }).map(|is_selected| is_selected.then(|| Some("text-primary")))
-                                        )}
-                                        onclick={onclick_word(word.clone(), selected_word.clone())}
-                                    >
-                                        {format!("{word}: {entropy}, {left_turns}")}
-                                    </li>
+                            if let Some(ref word_set) = word_sets.0.iter().find(|word_set| &word_set.borrow().name == selected.0.as_ref().unwrap()) {
+                                if let Some(ref entropies) = word_set.borrow().entropies {
+                                    entropies
+                                        .iter().take(*max_words_shown).map(|(entropy_data, left_turns)| {
+                                            let word = &entropy_data.word;
+                                            let entropy = &entropy_data.entropy;
+                                            html! {
+                                                <li
+                                                    key={format!("{word}")}
+                                                    class={classes!(
+                                                        "c-hand",
+                                                        (*selected_word).clone().map(|selected_word| { *word == selected_word }).map(|is_selected| is_selected.then(|| Some("text-primary")))
+                                                    )}
+                                                    onclick={onclick_word(word.clone(), selected_word.clone())}
+                                                >
+                                                    {format!("{word}: {entropy}, {left_turns}")}
+                                                </li>
+                                            }
+                                        }).collect::<Html>()
+                                } else {
+                                    html! {<> </>}
                                 }
-                            }).collect::<Html>()
+                            } else {
+                                html! {<> </>}
+                            }
                         }
                     </ul>
                 </div>
