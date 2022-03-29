@@ -19,12 +19,12 @@ pub enum Route {
     Home,
     #[at("/collections")]
     WordSets,
-    #[at("/entropy")]
-    EntropyCalculation,
-    #[at("/simulation")]
-    Simulation,
-    #[at("/solver/:id")]
-    Solver,
+    #[at("/entropy/:name")]
+    EntropyCalculation { name: String },
+    #[at("/simulation/:name")]
+    Simulation { name: String },
+    #[at("/solver/:name")]
+    Solver { name: String },
     #[not_found]
     #[at("/404")]
     NotFound,
@@ -55,7 +55,6 @@ pub fn word_set_select() -> Html {
                                 let text = response.text().await.unwrap();
                                 let dictionary = parse_words::<_, 5>(text.lines());
                                 word_sets.set((*word_sets).extend_with(WordSet::from_dictionary(
-                                    0,
                                     "Polish words scrabble".to_string(),
                                     dictionary,
                                 )));
@@ -112,13 +111,13 @@ pub fn view() -> Html {
                         <Link<Route> classes="btn btn-link" to={Route::WordSets}>
                             { "Word sets" }
                         </Link<Route>>
-                        <Link<Route> classes="btn btn-link" to={Route::EntropyCalculation}>
+                        <Link<Route> classes="btn btn-link" to={Route::EntropyCalculation { name: "".to_string() }}>
                             { "Entropy Calculation" }
                         </Link<Route>>
-                        <Link<Route> classes="btn btn-link" to={Route::Simulation}>
+                        <Link<Route> classes="btn btn-link" to={Route::Simulation { name: "".to_string() }}>
                             { "Simulation" }
                         </Link<Route>>
-                        <Link<Route> classes="btn btn-link" to={Route::Solver}>
+                        <Link<Route> classes="btn btn-link" to={Route::Solver { name: "".to_string() }}>
                             { "Solver" }
                         </Link<Route>>
                     </section>
@@ -139,14 +138,14 @@ fn switch(routes: &Route) -> Html {
         Route::Home | Route::WordSets => {
             html! { <WordSets /> }
         }
-        Route::EntropyCalculation => {
-            html! { <EntropyCalculation /> }
+        Route::EntropyCalculation { name } => {
+            html! { <EntropyCalculation name={name} /> }
         }
-        Route::Simulation => {
-            html! { <Simulation /> }
+        Route::Simulation { name } => {
+            html! { <Simulation name={name} /> }
         }
-        Route::Solver => {
-            html! { <Solver /> }
+        Route::Solver { name } => {
+            html! { <Solver name={name} /> }
         }
         Route::NotFound => {
             html! { <PageNotFound /> }

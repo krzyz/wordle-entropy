@@ -4,39 +4,18 @@ use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, rc::Rc};
 use wordle_entropy_core::structs::{Dictionary, EntropiesData};
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-pub enum WordSetState {
-    Unloaded,
-    LoadedDictionary,
-    LoadedAll,
-}
-
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct WordSet {
-    pub id: usize,
     pub name: String,
-    pub state: WordSetState,
-    pub dictionary: Option<Dictionary<5>>,
+    pub dictionary: Dictionary<5>,
     pub entropies: Option<Vec<EntropiesData<5>>>,
 }
 
 impl WordSet {
-    pub fn new(id: usize, name: String) -> Self {
+    pub fn from_dictionary(name: String, dictionary: Dictionary<5>) -> Self {
         Self {
-            id,
             name,
-            state: WordSetState::Unloaded,
-            dictionary: None,
-            entropies: None,
-        }
-    }
-
-    pub fn from_dictionary(id: usize, name: String, dictionary: Dictionary<5>) -> Self {
-        Self {
-            id,
-            name,
-            state: WordSetState::LoadedDictionary,
-            dictionary: Some(dictionary),
+            dictionary,
             entropies: None,
         }
     }

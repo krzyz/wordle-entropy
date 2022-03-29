@@ -6,6 +6,7 @@ use gloo_file::callbacks::read_as_text;
 use gloo_worker::{Bridged, Worker};
 use plotters::prelude::*;
 use plotters_canvas::CanvasBackend;
+use yew::Properties;
 use std::cmp::Ordering::Equal;
 use std::rc::Rc;
 use web_sys::{FocusEvent, HtmlCanvasElement, HtmlInputElement, Performance};
@@ -124,8 +125,19 @@ impl Reducible for WordsState {
     }
 }
 
+#[derive(Properties, PartialEq)]
+pub struct Props {
+    pub name: String,
+}
+
 #[function_component(EntropyCalculation)]
-pub fn app() -> Html {
+pub fn app(props: &Props) -> Html {
+    let word_sets = use_atom::<WordSetVec>();
+    let selected = use_atom::<WordSetSelection>();
+    if props.name != "" {
+        selected.set(WordSetSelection(Some(props.name.clone())))
+    }
+
     let word_state = use_reducer(WordsState::default);
     let file_input_node_ref = use_node_ref();
     let canvas_node_ref = use_node_ref();
@@ -171,9 +183,6 @@ pub fn app() -> Html {
     }
 
 
-    let word_sets = use_atom::<WordSetVec>();
-    let selected = use_atom::<WordSetSelection>();
-
     let worker = use_mut_ref(|| WordleWorker::bridge(Rc::new(cb)));
 
     let onclick_run = {
@@ -185,7 +194,7 @@ pub fn app() -> Html {
             log::info!("run");
             let dictionary = if let Some(word_set) = word_sets.0.iter().find(|word_set| Some(word_set.borrow().name.clone()) == selected.0) {
                 log::info!("found word_set");
-                word_set.borrow().dictionary.clone()
+                Some(word_set.borrow().dictionary.clone())
             } else {
                 None
             };
