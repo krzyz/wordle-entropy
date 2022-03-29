@@ -88,8 +88,9 @@ pub fn view() -> Html {
                                         } else {
                                             html! {
                                                 <>
-                                                    <span> {"Unloaded"} </span>
-                                                    <Link<Route> to={Route::EntropyCalculation { name }} >{"Generate"}</Link<Route>>
+                                                    <span> {"Unloaded("} </span>
+                                                    <Link<Route> to={Route::EntropyCalculation} >{"Generate"}</Link<Route>>
+                                                    <span> {")"} </span>
                                                 </>
                                             }
                                         }

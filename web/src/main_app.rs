@@ -19,12 +19,12 @@ pub enum Route {
     Home,
     #[at("/collections")]
     WordSets,
-    #[at("/entropy/:name")]
-    EntropyCalculation { name: String },
-    #[at("/simulation/:name")]
-    Simulation { name: String },
-    #[at("/solver/:name")]
-    Solver { name: String },
+    #[at("/entropy")]
+    EntropyCalculation,
+    #[at("/simulation")]
+    Simulation,
+    #[at("/solver")]
+    Solver,
     #[not_found]
     #[at("/404")]
     NotFound,
@@ -111,13 +111,13 @@ pub fn view() -> Html {
                         <Link<Route> classes="btn btn-link" to={Route::WordSets}>
                             { "Word sets" }
                         </Link<Route>>
-                        <Link<Route> classes="btn btn-link" to={Route::EntropyCalculation { name: "".to_string() }}>
+                        <Link<Route> classes="btn btn-link" to={Route::EntropyCalculation}>
                             { "Entropy Calculation" }
                         </Link<Route>>
-                        <Link<Route> classes="btn btn-link" to={Route::Simulation { name: "".to_string() }}>
+                        <Link<Route> classes="btn btn-link" to={Route::Simulation}>
                             { "Simulation" }
                         </Link<Route>>
-                        <Link<Route> classes="btn btn-link" to={Route::Solver { name: "".to_string() }}>
+                        <Link<Route> classes="btn btn-link" to={Route::Solver}>
                             { "Solver" }
                         </Link<Route>>
                     </section>
@@ -138,14 +138,14 @@ fn switch(routes: &Route) -> Html {
         Route::Home | Route::WordSets => {
             html! { <WordSets /> }
         }
-        Route::EntropyCalculation { name } => {
-            html! { <EntropyCalculation name={name} /> }
+        Route::EntropyCalculation => {
+            html! { <EntropyCalculation name={"".to_string()} /> }
         }
-        Route::Simulation { name } => {
-            html! { <Simulation name={name} /> }
+        Route::Simulation {} => {
+            html! { <Simulation name={"".to_string()} /> }
         }
-        Route::Solver { name } => {
-            html! { <Solver name={name} /> }
+        Route::Solver {} => {
+            html! { <Solver name={"".to_string()} /> }
         }
         Route::NotFound => {
             html! { <PageNotFound /> }
