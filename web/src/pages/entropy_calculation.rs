@@ -153,9 +153,9 @@ pub fn app(props: &Props) -> Html {
                     .as_ref()
                     .map(|selected_word| {
                         let word_sets = word_sets.clone();
-                        let word_entropy = if let Some(ref word_set) = word_sets.0.iter().find(|word_set| &word_set.borrow().name == selected.0.as_ref().unwrap()) {
+                        let word_entropy = if let Some(ref word_set) = word_sets.0.iter().find(|word_set| Some(&word_set.name) == selected.0.as_ref()) {
                             let word_set = word_set.clone();
-                            if let Some(entropies) = word_set.borrow().entropies.clone() {
+                            if let Some(entropies) = word_set.entropies.clone() {
                                 entropies
                                     .iter()
                                     .find(|&(entropies_data, _)| &entropies_data.word == selected_word)
@@ -188,9 +188,9 @@ pub fn app(props: &Props) -> Html {
         let worker = worker.clone();
         Callback::from(move |_| {
             log::info!("run");
-            let dictionary = if let Some(word_set) = word_sets.0.iter().find(|word_set| Some(word_set.borrow().name.clone()) == selected.0) {
+            let dictionary = if let Some(word_set) = word_sets.0.iter().find(|word_set| Some(&word_set.name) == selected.0.as_ref()) {
                 log::info!("found word_set");
-                Some(word_set.borrow().dictionary.clone())
+                Some((*word_set.dictionary).clone())
             } else {
                 None
             };
@@ -251,8 +251,8 @@ pub fn app(props: &Props) -> Html {
                     <input id="max_words_shown_input" onchange={on_max_words_shown_change} value={(*max_words_shown).to_string()}/>
                     <ul class="words_entropies_list">
                         {
-                            if let Some(ref word_set) = word_sets.0.iter().find(|word_set| &word_set.borrow().name == selected.0.as_ref().unwrap()) {
-                                if let Some(ref entropies) = word_set.borrow().entropies {
+                            if let Some(ref word_set) = word_sets.0.iter().find(|word_set| &word_set.name == selected.0.as_ref().unwrap()) {
+                                if let Some(ref entropies) = word_set.entropies {
                                     entropies
                                         .iter().take(*max_words_shown).map(|(entropy_data, left_turns)| {
                                             let word = &entropy_data.word;

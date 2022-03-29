@@ -32,7 +32,7 @@ yew-router = "0.16.0"
 gloo-storage = "0.2.0"
 bounce = { git = "https://github.com/futursolo/bounce.git", rev = "5869951" }
 reqwest = "0.11.10"
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1", features = ["derive", "rc"] }
 
 
 [dependencies.web-sys]

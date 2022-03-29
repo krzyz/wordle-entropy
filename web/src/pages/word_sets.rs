@@ -75,12 +75,13 @@ pub fn view() -> Html {
                         <th>{"Name"}</th>
                         <th>{"# of words"}</th>
                         <th>{ "Entropies" }</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
                     {
                         word_sets.0.iter().map(|word_set| {
-                            let word_set = word_set.borrow();
+                            let word_set = word_set;
                             let name = word_set.name.clone();
                             html! {
                                 <tr>
@@ -99,6 +100,9 @@ pub fn view() -> Html {
                                             }
                                         }
                                     }</td>
+                                    <td>
+                                        <button class="btn">{"Remove"}</button>
+                                    </td>
                                 </tr>
                             }
                         }).collect::<Html>()

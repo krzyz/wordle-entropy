@@ -81,7 +81,7 @@ pub fn word_set_select() -> Html {
 
     if word_sets.0.len() > 0 && *selected == WordSetSelection(None) {
         selected.set(WordSetSelection(Some(
-            word_sets.0.iter().next().unwrap().borrow().name.clone(),
+            word_sets.0.iter().next().unwrap().name.clone(),
         )));
     }
 
@@ -89,7 +89,7 @@ pub fn word_set_select() -> Html {
         <select name="word_sets">
             {
                 word_sets.0.iter().map(|word_set| {
-                    let name = word_set.borrow().name.clone();
+                    let name = word_set.name.clone();
                     let name_optional = Some(name.clone());
                     html! {
                         <option value={name.clone()} onchange={onchange()} selected={selected.0 == name_optional }> {name} </option>
