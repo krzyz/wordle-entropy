@@ -24,25 +24,29 @@ pub fn form() -> Html {
             e.prevent_default();
             let name_input = name_input_node_ref.cast::<HtmlInputElement>().unwrap();
             let name = name_input.value();
-            let file_input = file_input_node_ref.cast::<HtmlInputElement>().unwrap();
-            let files = file_input
-                .files()
-                .map(|files| gloo_file::FileList::from(files));
+            if name != "" {
+                let file_input = file_input_node_ref.cast::<HtmlInputElement>().unwrap();
+                let files = file_input
+                    .files()
+                    .map(|files| gloo_file::FileList::from(files));
 
-            if let Some(files) = files {
-                if let Some(file) = files.first() {
-                    *file_reader.borrow_mut() = Some(read_as_text(&file, move |res| match res {
-                        Ok(content) => {
-                            let dictionary = parse_words::<_, 5>(
-                                content.lines(),
-                            );
-                            dispatch_word_set(WordSetVecAction::LoadWords(name, dictionary));
-                        }
-                        Err(err) => {
-                            log::info!("Reading file error: {err}");
-                        }
-                    }));
+                if let Some(files) = files {
+                    if let Some(file) = files.first() {
+                        *file_reader.borrow_mut() = Some(read_as_text(&file, move |res| match res {
+                            Ok(content) => {
+                                let dictionary = parse_words::<_, 5>(
+                                    content.lines(),
+                                );
+                                dispatch_word_set(WordSetVecAction::LoadWords(name, dictionary));
+                            }
+                            Err(err) => {
+                                log::info!("Reading file error: {err}");
+                            }
+                        }));
+                    }
                 }
+            } else {
+                log::info!("Name can't be empty!");
             }
         })
     };
@@ -101,6 +105,7 @@ pub fn view() -> Html {
                     }
                 </tbody>
             </table>
+            <AddWordSetForm />
 
         </container>
     }
