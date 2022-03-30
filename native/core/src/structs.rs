@@ -1,38 +1,93 @@
-use crate::{arrays, translator::Translator};
+use crate::translator::Translator;
+#[cfg(feature = "terminal")]
 use colored::Colorize;
 use core::fmt;
 use fxhash::FxHashMap;
+use serde::{
+    de::{self, Visitor},
+    Deserializer, Serializer,
+};
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DeserializeFromStr, SerializeDisplay};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
     iter,
+    str::FromStr,
 };
 
-#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Copy, Clone, Debug, SerializeDisplay, DeserializeFromStr, PartialEq, Eq, PartialOrd, Ord, Hash,
+)]
 pub enum Hint {
     Wrong,
     OutOfPlace,
     Correct,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct HintsN<const N: usize>(#[serde(with = "arrays")] pub [Hint; N]);
+impl FromStr for Hint {
+    type Err = &'static str;
 
-impl<const N: usize> HintsN<N> {
-    pub fn from_str(hints_str: &str) -> Result<Self, &'static str> {
-        hints_str
-            .chars()
-            .map(|c| match c.to_ascii_lowercase() {
-                'w' => Ok(Hint::Wrong),
-                'o' => Ok(Hint::OutOfPlace),
-                'c' => Ok(Hint::Correct),
-                _ => Err("Wrong character"),
-            })
-            .collect::<Result<Vec<_>, _>>()?
-            .try_into()
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.chars().next().map(|x| x.to_ascii_lowercase()) {
+            Some(x) if x == 'w' => Ok(Hint::Wrong),
+            Some(x) if x == 'o' => Ok(Hint::OutOfPlace),
+            Some(x) if x == 'c' => Ok(Hint::Correct),
+            _ => Err("Wrong character"),
+        }
+    }
+}
+
+impl fmt::Display for Hint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let char = match self {
+            Hint::Wrong => 'w',
+            Hint::OutOfPlace => 'o',
+            Hint::Correct => 'c',
+        };
+
+        write!(f, "{}", char).unwrap();
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct HintsN<const N: usize>(pub [Hint; N]);
+
+impl<const N: usize> Serialize for HintsN<N> {
+    fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+        ser.serialize_str(&format!("{}", self))
+    }
+}
+
+struct HintsNVisitor<const N: usize>;
+
+impl<'de, const N: usize> Visitor<'de> for HintsNVisitor<N> {
+    type Value = HintsN<N>;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str(&format!("hints of length {}", N))
     }
 
+    #[inline]
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        HintsN::<N>::from_str(value).map_err(de::Error::custom)
+    }
+}
+
+impl<'de, const N: usize> Deserialize<'de> for HintsN<N> {
+    fn deserialize<D>(deserializer: D) -> Result<HintsN<N>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_str(HintsNVisitor::<N>)
+    }
+}
+
+impl<const N: usize> HintsN<N> {
     pub fn correct() -> Self {
         Self([Hint::Correct; N])
     }
@@ -42,6 +97,23 @@ impl<const N: usize> HintsN<N> {
     }
 }
 
+impl<const N: usize> FromStr for HintsN<N> {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.chars()
+            .map(|c| match c.to_ascii_lowercase() {
+                'w' => Ok(Hint::Wrong),
+                'o' => Ok(Hint::OutOfPlace),
+                'c' => Ok(Hint::Correct),
+                _ => Err("Wrong character"),
+            })
+            .collect::<Result<Vec<_>, _>>()?
+            .try_into()
+    }
+}
+
+#[cfg(feature = "terminal")]
 impl<const N: usize> fmt::Display for HintsN<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for &hint in self.0.iter() {
@@ -49,6 +121,22 @@ impl<const N: usize> fmt::Display for HintsN<N> {
                 Hint::Wrong => "■".red(),
                 Hint::OutOfPlace => "■".yellow(),
                 Hint::Correct => "■".green(),
+            };
+
+            write!(f, "{}", square).unwrap();
+        }
+        Ok(())
+    }
+}
+
+#[cfg(not(feature = "terminal"))]
+impl<const N: usize> fmt::Display for HintsN<N> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for &hint in self.0.iter() {
+            let square = match hint {
+                Hint::Wrong => "W",
+                Hint::OutOfPlace => "O",
+                Hint::Correct => "C",
             };
 
             write!(f, "{}", square).unwrap();
@@ -69,9 +157,10 @@ impl<const N: usize> TryFrom<Vec<Hint>> for HintsN<N> {
     }
 }
 
+#[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 #[serde(bound = "T: Serialize, for<'de2> T: Deserialize<'de2>")]
-pub struct WordN<T, const N: usize>(#[serde(with = "arrays")] pub [T; N])
+pub struct WordN<T, const N: usize>(#[serde_as(as = "[_; N]")] pub [T; N])
 where
     T: Serialize,
     for<'de2> T: Deserialize<'de2>;
@@ -162,10 +251,12 @@ impl<const N: usize> KnowledgeN<N> {
     }
 }
 
+#[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EntropiesData<const N: usize> {
     pub word: WordN<char, N>,
     pub entropy: f64,
+    #[serde_as(as = "HashMap<DisplayFromStr, _, _")]
     pub probabilities: FxHashMap<HintsN<N>, f64>,
 }
 
@@ -183,7 +274,6 @@ impl<const N: usize> EntropiesData<N> {
     }
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Dictionary<const N: usize> {
     pub words: Vec<WordN<char, N>>,
@@ -196,6 +286,27 @@ impl<const N: usize> Dictionary<N> {
     pub fn new(words: Vec<WordN<char, N>>, probabilities: Vec<f64>) -> Self {
         let translator = Translator::generate(&words);
         let words_bytes = words.iter().map(|w| translator.to_bytes(w)).collect();
-        Self { words, words_bytes, probabilities, translator }
+        Self {
+            words,
+            words_bytes,
+            probabilities,
+            translator,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn serialize_entropies_data() {
+        let word = WordN::<char, 5>::new("word1");
+        let mut hints_map = FxHashMap::default();
+        hints_map.insert(HintsN::<5>::from_str("OOWWC").unwrap(), 0.12);
+        let entropies_data = EntropiesData::<5>::new(word, 0., hints_map);
+
+        let serialized = serde_json::to_string(&entropies_data).unwrap();
+        print!("{}", serialized);
     }
 }

@@ -6,19 +6,22 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-colored = "2.0.0"
+colored = { version = "2.0.0", optional = true }
 itertools = "0.10.3"
-ndarray = {version = "0.15.4"}
-getrandom = {version = "*", features = ["js"]}
+ndarray = { version = "0.15.4" }
+getrandom = { version = "*", features = ["js"] }
 rand = "0.8.5"
-rayon = {version = "1.5.1", optional = true}
+rayon = { version = "1.5.1", optional = true }
 serde = { version = "1", features = ["derive"] }
 fxhash = "0.2.1"
 arrayvec = "0.7.2"
+serde_with = "1.12.0"
 
 [features]
 default = ["parallel"]
 parallel = ["rayon", "ndarray/rayon"]
+terminal = ["colored"]
 
 [dev-dependencies]
 rstest = "0.12.0"
+serde_json = "1"

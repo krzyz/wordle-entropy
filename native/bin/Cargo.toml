@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-wordle-entropy-core = { path = "../core" }
+wordle-entropy-core = { path = "../core", features = ["terminal"] }
 plotters = "0.3.1"
 varpro = "0.3.0"
 nalgebra = "0.29"

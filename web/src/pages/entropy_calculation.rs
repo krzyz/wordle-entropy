@@ -190,7 +190,7 @@ pub fn app(props: &Props) -> Html {
             log::info!("run");
             let dictionary = if let Some(word_set) = word_sets.0.iter().find(|word_set| Some(&word_set.name) == selected.0.as_ref()) {
                 log::info!("found word_set");
-                Some((*word_set.dictionary).clone())
+                Some(word_set.dictionary.clone())
             } else {
                 None
             };

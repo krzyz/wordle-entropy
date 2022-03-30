@@ -8,15 +8,15 @@ use wordle_entropy_core::structs::{Dictionary, EntropiesData};
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct WordSet {
     pub name: String,
-    pub dictionary: Rc<Dictionary<5>>,
-    pub entropies: Option<Rc<Vec<(EntropiesData<5>, f64)>>>,
+    pub dictionary: Dictionary<5>,
+    pub entropies: Option<Vec<(EntropiesData<5>, f64)>>,
 }
 
 impl WordSet {
     pub fn from_dictionary(name: String, dictionary: Dictionary<5>) -> Self {
         Self {
             name,
-            dictionary: Rc::new(dictionary),
+            dictionary,
             entropies: None,
         }
     }
@@ -25,7 +25,7 @@ impl WordSet {
         Self {
             name: self.name.clone(),
             dictionary: self.dictionary.clone(),
-            entropies: Some(Rc::new(entropies)),
+            entropies: Some(entropies),
         }
     }
 }
@@ -40,9 +40,21 @@ pub enum WordSetVecAction {
 #[observed]
 pub struct WordSetVec(pub Vec<WordSet>);
 
+static STORAGE_VEC_NAMES: &str = "word_sets_names";
+
+fn get_word_set_storage_key(name: &str) -> String {
+    format!("word_set:{name}")
+}
+
 impl Default for WordSetVec {
     fn default() -> Self {
-        WordSetVec(LocalStorage::get("word_set_vec").unwrap_or_else(|_| vec![]))
+        let names: Option<Vec<String>> = LocalStorage::get(STORAGE_VEC_NAMES).ok();
+        let vec = match names {
+            Some(names) => names.iter().filter_map(|name| LocalStorage::get(get_word_set_storage_key(name)).ok()).collect(),
+            None => vec![],
+        };
+
+        WordSetVec(vec)
     }
 }
 
@@ -56,7 +68,15 @@ impl WordSetVec {
 
 impl Observed for WordSetVec {
     fn changed(self: Rc<Self>) {
-        LocalStorage::set("word_set_vec", (*self).clone()).expect("Failed to set word set collection");
+        let names = self.0.iter().map(|x| x.name.clone()).collect::<Vec<_>>();
+        LocalStorage::set(STORAGE_VEC_NAMES, names).ok();
+        for word_set_without_entropies in self.0.iter().map(|word_set| WordSet {
+                    name: word_set.name.clone(),
+                    dictionary: word_set.dictionary.clone(),
+                    entropies: None,
+                }) {
+            LocalStorage::set(get_word_set_storage_key(&word_set_without_entropies.name), word_set_without_entropies).expect("Failed to set word set collection");
+        }
     }
 }
 

@@ -166,8 +166,9 @@ pub fn get_answers<const N: usize>(
 mod tests {
     use super::*;
     use crate::translator::Translator;
-
+    use std::str::FromStr;
     use rstest::rstest;
+
     const WORDS_LENGTH: usize = 5;
 
     type Word = WordN<char, WORDS_LENGTH>;
