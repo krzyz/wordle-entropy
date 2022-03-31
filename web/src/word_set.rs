@@ -1,9 +1,9 @@
 use bounce::prelude::*;
 use gloo_storage::{LocalStorage, Storage};
 use serde::{Deserialize, Serialize};
-use yew::Reducible;
 use std::rc::Rc;
 use wordle_entropy_core::structs::{Dictionary, EntropiesData};
+use yew::Reducible;
 
 use crate::components::word_set_select::WordSetSelection;
 
@@ -34,6 +34,7 @@ impl WordSet {
 
 pub enum WordSetVecAction {
     Set(WordSetVec),
+    Remove(String),
     LoadWords(String, Dictionary<5>),
     SetEntropy(String, Vec<(EntropiesData<5>, f64)>),
 }
@@ -52,7 +53,10 @@ impl Default for WordSetVec {
     fn default() -> Self {
         let names: Option<Vec<String>> = LocalStorage::get(STORAGE_VEC_NAMES).ok();
         let vec = match names {
-            Some(names) => names.iter().filter_map(|name| LocalStorage::get(get_word_set_storage_key(name)).ok()).collect(),
+            Some(names) => names
+                .iter()
+                .filter_map(|name| LocalStorage::get(get_word_set_storage_key(name)).ok())
+                .collect(),
             None => vec![],
         };
 
@@ -73,11 +77,15 @@ impl Observed for WordSetVec {
         let names = self.0.iter().map(|x| x.name.clone()).collect::<Vec<_>>();
         LocalStorage::set(STORAGE_VEC_NAMES, names).ok();
         for word_set_without_entropies in self.0.iter().map(|word_set| WordSet {
-                    name: word_set.name.clone(),
-                    dictionary: word_set.dictionary.clone(),
-                    entropies: None,
-                }) {
-            LocalStorage::set(get_word_set_storage_key(&word_set_without_entropies.name), word_set_without_entropies).expect("Failed to set word set collection");
+            name: word_set.name.clone(),
+            dictionary: word_set.dictionary.clone(),
+            entropies: None,
+        }) {
+            LocalStorage::set(
+                get_word_set_storage_key(&word_set_without_entropies.name),
+                word_set_without_entropies,
+            )
+            .expect("Failed to set word set collection");
         }
     }
 }
@@ -88,16 +96,33 @@ impl Reducible for WordSetVec {
     fn reduce(self: Rc<Self>, action: Self::Action) -> Rc<Self> {
         match action {
             WordSetVecAction::Set(word_set_vec) => Rc::new(word_set_vec),
-            WordSetVecAction::LoadWords(name, dictionary) => { 
+            WordSetVecAction::Remove(name) => Rc::new(WordSetVec(
+                self.0
+                    .iter()
+                    .filter(|word_set| word_set.name != name)
+                    .cloned()
+                    .collect(),
+            )),
+            WordSetVecAction::LoadWords(name, dictionary) => {
                 Rc::new(self.extend_with(WordSet::from_dictionary(name, dictionary)))
             }
             WordSetVecAction::SetEntropy(name, entropies_data) => {
-                let mut new_vec = self.0.iter().filter(|word_set| word_set.name != name).cloned().collect::<Vec<_>>();
-                if let Some(word_set) = self.0.iter().find(|word_set| word_set.name == name).cloned() {
+                let mut new_vec = self
+                    .0
+                    .iter()
+                    .filter(|word_set| word_set.name != name)
+                    .cloned()
+                    .collect::<Vec<_>>();
+                if let Some(word_set) = self
+                    .0
+                    .iter()
+                    .find(|word_set| word_set.name == name)
+                    .cloned()
+                {
                     new_vec.push(word_set.with_entropies(entropies_data));
                 }
                 Rc::new(WordSetVec(new_vec))
-            } 
+            }
         }
     }
 }

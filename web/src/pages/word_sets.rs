@@ -64,6 +64,14 @@ pub fn form() -> Html {
 #[function_component(WordSets)]
 pub fn view() -> Html {
     let word_sets = use_slice::<WordSetVec>();
+
+    let onclick_remove = |name: String| {
+        let dispatch_word_sets = use_slice_dispatch::<WordSetVec>();
+        Callback::from(move |_| {
+            dispatch_word_sets(WordSetVecAction::Remove(name.to_string()));
+        })
+    };
+
     html! {
         <container>
             <h1>
@@ -101,7 +109,7 @@ pub fn view() -> Html {
                                         }
                                     }</td>
                                     <td>
-                                        <button class="btn">{"Remove"}</button>
+                                        <button onclick={onclick_remove(name.clone())} class="btn">{"Remove"}</button>
                                     </td>
                                 </tr>
                             }
