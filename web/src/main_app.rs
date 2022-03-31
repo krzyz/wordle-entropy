@@ -129,14 +129,15 @@ pub fn view() -> Html {
                         <WordSetSelect />
                     </section>
                 </nav>
-                <MainSection />
+                <main>
+                    <Switch<Route> render={Switch::render(switch)} />
+                </main>
             </BrowserRouter>
         </BounceRoot>
     }
 }
 
-#[function_component(MainSection)]
-pub fn main_section() -> Html {
+pub fn get_current_word_set() -> WordSet {
     let word_sets = use_slice::<WordSetVec>();
     let select = use_atom::<WordSetSelection>();
     let word_set = word_sets
@@ -150,21 +151,16 @@ pub fn main_section() -> Html {
         ));
 
     log::info!("Word set: {}", word_set.name);
-
-    html! {
-        <main>
-            <Switch<Route> render={Switch::render(move |r| switch(r, word_set.clone()))} />
-        </main>
-    }
+    word_set
 }
 
-fn switch(routes: &Route, word_set: WordSet) -> Html {
+fn switch(routes: &Route) -> Html {
     match routes.clone() {
         Route::Home | Route::WordSets => {
             html! { <WordSets /> }
         }
         Route::EntropyCalculation => {
-            html! { <EntropyCalculation {word_set} /> }
+            html! { <EntropyCalculation /> }
         }
         Route::Simulation {} => {
             html! { <Simulation /> }

@@ -11,8 +11,8 @@ pub struct WordleWorker {
 impl Worker for WordleWorker {
     type Reach = Public<Self>;
     type Message = ();
-    type Input = Dictionary<5>;
-    type Output = Vec<(EntropiesData<5>, f64)>;
+    type Input = (String, Dictionary<5>);
+    type Output = (String, Vec<(EntropiesData<5>, f64)>);
 
     fn create(link: WorkerLink<Self>) -> Self {
         Self { link }
@@ -20,10 +20,9 @@ impl Worker for WordleWorker {
 
     fn update(&mut self, _msg: Self::Message) {}
 
-    fn handle_input(&mut self, msg: Self::Input, id: HandlerId) {
-        let dictionary = &msg;
+    fn handle_input(&mut self, (name, dictionary): Self::Input, id: HandlerId) {
         let answers = (0..dictionary.words.len()).collect::<Vec<_>>();
-        let entropies = calculate_entropies(dictionary, &answers);
+        let entropies = calculate_entropies(&dictionary, &answers);
 
         let uncertainty = (dictionary.words.len() as f64).log2();
         let prob_norm: f64 = answers.iter().map(|&i| dictionary.probabilities[i]).sum();
@@ -49,7 +48,7 @@ impl Worker for WordleWorker {
             score1.partial_cmp(&score2).unwrap_or(Equal)
         });
 
-        self.link.respond(id, scores);
+        self.link.respond(id, (name, scores));
     }
 
     fn name_of_resource() -> &'static str {

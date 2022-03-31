@@ -1,4 +1,5 @@
-use crate::word_set::{WordSet, WordSetVec, WordSetVecAction};
+use crate::main_app::get_current_word_set;
+use crate::word_set::{WordSetVec, WordSetVecAction};
 use crate::worker::WordleWorker;
 use bounce::use_slice_dispatch;
 use gloo_worker::{Bridged, Worker};
@@ -8,7 +9,6 @@ use std::cmp::Ordering::Equal;
 use std::rc::Rc;
 use web_sys::{HtmlCanvasElement, HtmlInputElement, Performance};
 use wordle_entropy_core::structs::WordN;
-use yew::Properties;
 use yew::{
     classes, events::Event, function_component, html, use_effect_with_deps, use_mut_ref,
     use_node_ref, use_reducer, use_state, Callback, Html, Reducible, TargetCast, UseStateHandle,
@@ -105,14 +105,9 @@ impl Reducible for WordsState {
     }
 }
 
-#[derive(Properties, PartialEq)]
-pub struct Props {
-    pub word_set: WordSet,
-}
-
 #[function_component(EntropyCalculation)]
-pub fn app(props: &Props) -> Html {
-    let word_set = &props.word_set;
+pub fn app() -> Html {
+    let word_set = get_current_word_set();
     let dispatch_word_sets = use_slice_dispatch::<WordSetVec>();
 
     let word_state = use_reducer(WordsState::default);
@@ -129,17 +124,16 @@ pub fn app(props: &Props) -> Html {
     };
 
     let cb = {
-        let word_set_name = word_set.name.clone();
         let word_state = word_state.clone();
         let selected_word = selected_word.clone();
         let dispatch_word_sets = dispatch_word_sets.clone();
-        move |output: <WordleWorker as Worker>::Output| {
-            if let Some((entropies_data, _)) = output.iter().next() {
+        move |(name, entropies_output): <WordleWorker as Worker>::Output| {
+            if let Some((entropies_data, _)) = entropies_output.iter().next() {
                 selected_word.set(Some(entropies_data.word.clone()));
             }
 
-            log::info!("Setting entropy: {}", word_set_name);
-            dispatch_word_sets(WordSetVecAction::SetEntropy(word_set_name.clone(), output));
+            log::info!("Setting entropy: {}", name);
+            dispatch_word_sets(WordSetVecAction::SetEntropy(name, entropies_output));
             word_state.dispatch(WordsAction::EndCalc);
         }
     };
@@ -190,7 +184,7 @@ pub fn app(props: &Props) -> Html {
         Callback::from(move |_| {
             log::info!("run");
             log::info!("found dictionary of: {}", word_set.name);
-            worker.borrow_mut().send(word_set.dictionary.clone());
+            worker.borrow_mut().send((word_set.name.clone(), word_set.dictionary.clone()));
             log::info!("dictionary send");
             word_state.dispatch(WordsAction::StartCalc);
         })
