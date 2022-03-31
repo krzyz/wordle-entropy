@@ -3,11 +3,12 @@ use crate::pages::{
     solver::Solver, word_sets::WordSets,
 };
 use crate::word_set::{WordSet, WordSetVec, WordSetVecAction};
-use bounce::{use_atom, Atom, BounceRoot, use_slice};
+use bounce::{use_atom, use_slice, Atom, BounceRoot};
 use reqwest::StatusCode;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
 use wordle_entropy_core::data::parse_words;
+use wordle_entropy_core::structs::Dictionary;
 use yew::events::Event;
 use yew::{function_component, html, use_effect_with_deps, Callback, Html, TargetCast};
 use yew_router::components::Link;
@@ -54,10 +55,12 @@ pub fn word_set_select() -> Html {
                             StatusCode::OK => {
                                 let text = response.text().await.unwrap();
                                 let dictionary = parse_words::<_, 5>(text.lines());
-                                word_sets.dispatch(WordSetVecAction::Set((*word_sets).extend_with(WordSet::from_dictionary(
-                                    "Polish words scrabble".to_string(),
-                                    dictionary,
-                                ))));
+                                word_sets.dispatch(WordSetVecAction::Set(
+                                    (*word_sets).extend_with(WordSet::from_dictionary(
+                                        "Polish words scrabble".to_string(),
+                                        dictionary,
+                                    )),
+                                ));
                                 log::info!("Loaded from url");
                             }
                             _ => log::info!("Error loading csv"),
@@ -71,9 +74,10 @@ pub fn word_set_select() -> Html {
         );
     }
 
-    let onchange = || {
+    let onchange = {
         let selected = use_atom::<WordSetSelection>();
         Callback::from(move |e: Event| {
+            log::info!("on select change");
             let select: HtmlInputElement = e.target_unchecked_into();
             selected.set(WordSetSelection(Some(select.value().clone())));
         })
@@ -86,13 +90,13 @@ pub fn word_set_select() -> Html {
     }
 
     html! {
-        <select name="word_sets">
+        <select name="word_sets" {onchange}>
             {
                 word_sets.0.iter().map(|word_set| {
                     let name = word_set.name.clone();
                     let name_optional = Some(name.clone());
                     html! {
-                        <option value={name.clone()} onchange={onchange()} selected={selected.0 == name_optional }> {name} </option>
+                        <option value={name.clone()} selected={selected.0 == name_optional }> {name} </option>
                     }
                 }).collect::<Html>()
             }
@@ -125,27 +129,48 @@ pub fn view() -> Html {
                         <WordSetSelect />
                     </section>
                 </nav>
-                <main>
-                    <Switch<Route> render={Switch::render(switch)} />
-                </main>
+                <MainSection />
             </BrowserRouter>
         </BounceRoot>
     }
 }
 
-fn switch(routes: &Route) -> Html {
+#[function_component(MainSection)]
+pub fn main_section() -> Html {
+    let word_sets = use_slice::<WordSetVec>();
+    let select = use_atom::<WordSetSelection>();
+    let word_set = word_sets
+        .0
+        .iter()
+        .find(|word_set| Some(&word_set.name) == select.0.as_ref())
+        .cloned()
+        .unwrap_or(WordSet::from_dictionary(
+            "invalid_word_set".to_string(),
+            Dictionary::new(vec![], vec![]),
+        ));
+
+    log::info!("Word set: {}", word_set.name);
+
+    html! {
+        <main>
+            <Switch<Route> render={Switch::render(move |r| switch(r, word_set.clone()))} />
+        </main>
+    }
+}
+
+fn switch(routes: &Route, word_set: WordSet) -> Html {
     match routes.clone() {
         Route::Home | Route::WordSets => {
             html! { <WordSets /> }
         }
         Route::EntropyCalculation => {
-            html! { <EntropyCalculation name={"".to_string()} /> }
+            html! { <EntropyCalculation {word_set} /> }
         }
         Route::Simulation {} => {
-            html! { <Simulation name={"".to_string()} /> }
+            html! { <Simulation /> }
         }
         Route::Solver {} => {
-            html! { <Solver name={"".to_string()} /> }
+            html! { <Solver /> }
         }
         Route::NotFound => {
             html! { <PageNotFound /> }

@@ -1,20 +1,7 @@
-use bounce::use_atom;
-use yew::{function_component, html, Properties};
-
-use crate::main_app::WordSetSelection;
-
-#[derive(Properties, PartialEq)]
-pub struct Props {
-    pub name: String,
-}
+use yew::{function_component, html};
 
 #[function_component(Simulation)]
-pub fn view(props: &Props) -> Html {
-    let selected = use_atom::<WordSetSelection>();
-    if props.name != "" {
-        selected.set(WordSetSelection(Some(props.name.clone())))
-    }
-
+pub fn view() -> Html {
     html! {
         <section>
             <div>

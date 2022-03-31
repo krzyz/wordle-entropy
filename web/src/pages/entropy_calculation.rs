@@ -1,15 +1,14 @@
-use crate::main_app::WordSetSelection;
-use crate::word_set::{WordSetVec, WordSetVecAction};
+use crate::word_set::{WordSet, WordSetVec, WordSetVecAction};
 use crate::worker::WordleWorker;
-use bounce::{use_atom, use_slice};
+use bounce::use_slice_dispatch;
 use gloo_worker::{Bridged, Worker};
 use plotters::prelude::*;
 use plotters_canvas::CanvasBackend;
-use yew::Properties;
 use std::cmp::Ordering::Equal;
 use std::rc::Rc;
 use web_sys::{HtmlCanvasElement, HtmlInputElement, Performance};
 use wordle_entropy_core::structs::WordN;
+use yew::Properties;
 use yew::{
     classes, events::Event, function_component, html, use_effect_with_deps, use_mut_ref,
     use_node_ref, use_reducer, use_state, Callback, Html, Reducible, TargetCast, UseStateHandle,
@@ -108,65 +107,69 @@ impl Reducible for WordsState {
 
 #[derive(Properties, PartialEq)]
 pub struct Props {
-    pub name: String,
+    pub word_set: WordSet,
 }
 
 #[function_component(EntropyCalculation)]
 pub fn app(props: &Props) -> Html {
-    let word_sets = use_slice::<WordSetVec>();
-    let selected = use_atom::<WordSetSelection>();
-    if props.name != "" {
-        selected.set(WordSetSelection(Some(props.name.clone())))
-    }
+    let word_set = &props.word_set;
+    let dispatch_word_sets = use_slice_dispatch::<WordSetVec>();
 
     let word_state = use_reducer(WordsState::default);
     let canvas_node_ref = use_node_ref();
-    let selected_word = use_state(|| -> Option<WordN<char, 5>> { None });
+    let selected_word = {
+        let word_set = word_set.clone();
+        use_state(|| {
+            if let Some(entropies) = word_set.entropies {
+                entropies.iter().next().map(|(entropies_data, _)| entropies_data.word.clone())
+            } else {
+                None
+            }
+        })
+    };
 
     let cb = {
+        let word_set_name = word_set.name.clone();
         let word_state = word_state.clone();
         let selected_word = selected_word.clone();
-        let selected = selected.clone();
-        let word_sets = word_sets.clone();
+        let dispatch_word_sets = dispatch_word_sets.clone();
         move |output: <WordleWorker as Worker>::Output| {
             if let Some((entropies_data, _)) = output.iter().next() {
                 selected_word.set(Some(entropies_data.word.clone()));
             }
 
-            word_sets.dispatch(WordSetVecAction::SetEntropy(selected.0.as_ref().unwrap().clone(), output));
+            log::info!("Setting entropy: {}", word_set_name);
+            dispatch_word_sets(WordSetVecAction::SetEntropy(word_set_name.clone(), output));
             word_state.dispatch(WordsAction::EndCalc);
         }
     };
 
     {
         let canvas_node_ref = canvas_node_ref.clone();
-        let word_state = word_state.clone();
-        let word_sets= word_sets.clone();
         let selected_word = selected_word.clone();
-        let selected = selected.clone();
+        let word_set = word_set.clone();
         use_effect_with_deps(
-            move |(_, selected_word)| {
+            move |selected_word| {
                 let canvas = canvas_node_ref.cast::<HtmlCanvasElement>().unwrap();
-                let word_sets= word_sets.clone();
+                let word_set = word_set.clone();
 
                 let data = selected_word
                     .as_ref()
                     .map(|selected_word| {
-                        let word_sets = word_sets.clone();
-                        let word_entropy = if let Some(ref word_set) = word_sets.0.iter().find(|word_set| Some(&word_set.name) == selected.0.as_ref()) {
-                            let word_set = word_set.clone();
-                            if let Some(entropies) = word_set.entropies.clone() {
-                                entropies
-                                    .iter()
-                                    .find(|&(entropies_data, _)| &entropies_data.word == selected_word)
-                                    .cloned()
-                            } else {
-                                None
-                            }
+                        let word_entropy = if let Some(entropies) = word_set.entropies.clone() {
+                            entropies
+                                .iter()
+                                .find(|&(entropies_data, _)| &entropies_data.word == selected_word)
+                                .cloned()
                         } else {
                             None
                         };
-                        word_entropy.map(|(entropies_data, _)| entropies_data.probabilities.into_values().collect::<Vec<_>>())
+                        word_entropy.map(|(entropies_data, _)| {
+                            entropies_data
+                                .probabilities
+                                .into_values()
+                                .collect::<Vec<_>>()
+                        })
                     })
                     .flatten()
                     .unwrap_or(vec![]);
@@ -174,31 +177,22 @@ pub fn app(props: &Props) -> Html {
                 draw_plot(canvas, &data[..]).unwrap();
                 || ()
             },
-            (word_state, selected_word),
+            selected_word,
         )
     }
-
 
     let worker = use_mut_ref(|| WordleWorker::bridge(Rc::new(cb)));
 
     let onclick_run = {
         let word_state = word_state.clone();
-        let word_sets = word_sets.clone();
-        let selected = selected.clone();
         let worker = worker.clone();
+        let word_set = word_set.clone();
         Callback::from(move |_| {
             log::info!("run");
-            let dictionary = if let Some(word_set) = word_sets.0.iter().find(|word_set| Some(&word_set.name) == selected.0.as_ref()) {
-                log::info!("found word_set");
-                Some(word_set.dictionary.clone())
-            } else {
-                None
-            };
-            if let Some(dictionary) = dictionary {
-                log::info!("found dictionary"); 
-                worker.borrow_mut().send(dictionary);
-                word_state.dispatch(WordsAction::StartCalc);
-            }
+            log::info!("found dictionary of: {}", word_set.name);
+            worker.borrow_mut().send(word_set.dictionary.clone());
+            log::info!("dictionary send");
+            word_state.dispatch(WordsAction::StartCalc);
         })
     };
 
@@ -209,10 +203,6 @@ pub fn app(props: &Props) -> Html {
             })
         }
     };
-
-    /*
-
-    */
 
     let max_words_shown = use_state(|| 10);
     let on_max_words_shown_change = {
@@ -251,28 +241,24 @@ pub fn app(props: &Props) -> Html {
                     <input id="max_words_shown_input" onchange={on_max_words_shown_change} value={(*max_words_shown).to_string()}/>
                     <ul class="words_entropies_list">
                         {
-                            if let Some(ref word_set) = word_sets.0.iter().find(|word_set| &word_set.name == selected.0.as_ref().unwrap()) {
-                                if let Some(ref entropies) = word_set.entropies {
-                                    entropies
-                                        .iter().take(*max_words_shown).map(|(entropy_data, left_turns)| {
-                                            let word = &entropy_data.word;
-                                            let entropy = &entropy_data.entropy;
-                                            html! {
-                                                <li
-                                                    key={format!("{word}")}
-                                                    class={classes!(
-                                                        "c-hand",
-                                                        (*selected_word).clone().map(|selected_word| { *word == selected_word }).map(|is_selected| is_selected.then(|| Some("text-primary")))
-                                                    )}
-                                                    onclick={onclick_word(word.clone(), selected_word.clone())}
-                                                >
-                                                    {format!("{word}: {entropy}, {left_turns}")}
-                                                </li>
-                                            }
-                                        }).collect::<Html>()
-                                } else {
-                                    html! {<> </>}
-                                }
+                            if let Some(ref entropies) = word_set.entropies {
+                                entropies
+                                    .iter().take(*max_words_shown).map(|(entropy_data, left_turns)| {
+                                        let word = &entropy_data.word;
+                                        let entropy = &entropy_data.entropy;
+                                        html! {
+                                            <li
+                                                key={format!("{word}")}
+                                                class={classes!(
+                                                    "c-hand",
+                                                    (*selected_word).clone().map(|selected_word| { *word == selected_word }).map(|is_selected| is_selected.then(|| Some("text-primary")))
+                                                )}
+                                                onclick={onclick_word(word.clone(), selected_word.clone())}
+                                            >
+                                                {format!("{word}: {entropy}, {left_turns}")}
+                                            </li>
+                                        }
+                                    }).collect::<Html>()
                             } else {
                                 html! {<> </>}
                             }
