@@ -1,5 +1,5 @@
 use crate::components::entropy_plot::EntropyPlot;
-use crate::main_app::get_current_word_set;
+use crate::word_set::get_current_word_set;
 use crate::word_set::{WordSetVec, WordSetVecAction};
 use crate::worker::WordleWorker;
 use bounce::use_slice_dispatch;

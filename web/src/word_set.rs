@@ -5,6 +5,8 @@ use yew::Reducible;
 use std::rc::Rc;
 use wordle_entropy_core::structs::{Dictionary, EntropiesData};
 
+use crate::components::word_set_select::WordSetSelection;
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct WordSet {
     pub name: String,
@@ -98,4 +100,21 @@ impl Reducible for WordSetVec {
             } 
         }
     }
+}
+
+pub fn get_current_word_set() -> WordSet {
+    let word_sets = use_slice::<WordSetVec>();
+    let select = use_atom::<WordSetSelection>();
+    let word_set = word_sets
+        .0
+        .iter()
+        .find(|word_set| Some(&word_set.name) == select.0.as_ref())
+        .cloned()
+        .unwrap_or(WordSet::from_dictionary(
+            "invalid_word_set".to_string(),
+            Dictionary::new(vec![], vec![]),
+        ));
+
+    log::info!("Word set: {}", word_set.name);
+    word_set
 }
