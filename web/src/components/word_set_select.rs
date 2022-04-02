@@ -1,12 +1,11 @@
+use crate::word_set::{WordSet, WordSetVec, WordSetVecAction};
 use bounce::{use_atom, use_slice, Atom};
 use reqwest::StatusCode;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
 use wordle_entropy_core::data::parse_words;
 use yew::events::Event;
-use yew::{function_component, use_effect, Callback, TargetCast, html, Html};
-
-use crate::word_set::{WordSet, WordSetVec, WordSetVecAction};
+use yew::{function_component, html, use_effect, Callback, Html, TargetCast};
 
 #[derive(Default, PartialEq, Atom)]
 pub struct WordSetSelection(pub Option<String>);

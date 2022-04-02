@@ -1,9 +1,12 @@
-use crate::{word_set::{WordSetVec, WordSetVecAction}, main_app::Route};
-use bounce::{use_slice_dispatch, use_slice};
+use crate::{
+    main_app::Route,
+    word_set::{WordSetVec, WordSetVecAction},
+};
+use bounce::{use_slice, use_slice_dispatch};
 use gloo_file::callbacks::read_as_text;
 use web_sys::HtmlInputElement;
 use wordle_entropy_core::data::parse_words;
-use yew::{function_component, html, Html, use_node_ref, Callback, FocusEvent, use_mut_ref};
+use yew::{function_component, html, use_mut_ref, use_node_ref, Callback, FocusEvent, Html};
 use yew_router::components::Link;
 
 #[function_component(AddWordSetForm)]
@@ -32,17 +35,18 @@ pub fn form() -> Html {
 
                 if let Some(files) = files {
                     if let Some(file) = files.first() {
-                        *file_reader.borrow_mut() = Some(read_as_text(&file, move |res| match res {
-                            Ok(content) => {
-                                let dictionary = parse_words::<_, 5>(
-                                    content.lines(),
-                                );
-                                dispatch_word_set(WordSetVecAction::LoadWords(name, dictionary));
-                            }
-                            Err(err) => {
-                                log::info!("Reading file error: {err}");
-                            }
-                        }));
+                        *file_reader.borrow_mut() =
+                            Some(read_as_text(&file, move |res| match res {
+                                Ok(content) => {
+                                    let dictionary = parse_words::<_, 5>(content.lines());
+                                    dispatch_word_set(WordSetVecAction::LoadWords(
+                                        name, dictionary,
+                                    ));
+                                }
+                                Err(err) => {
+                                    log::info!("Reading file error: {err}");
+                                }
+                            }));
                     }
                 }
             } else {

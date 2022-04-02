@@ -4,14 +4,14 @@ use crate::word_set::{WordSetVec, WordSetVecAction};
 use crate::worker::WordleWorker;
 use bounce::use_slice_dispatch;
 use gloo_worker::{Bridged, Worker};
-use yew::UseStateHandle;
 use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::HtmlInputElement;
 use wordle_entropy_core::structs::WordN;
+use yew::UseStateHandle;
 use yew::{
     classes, events::Event, function_component, html, use_mut_ref, use_state, Callback, Html,
-    TargetCast
+    TargetCast,
 };
 
 #[function_component(EntropyCalculation)]
@@ -78,7 +78,9 @@ pub fn view() -> Html {
     };
 
     let onclick_word = {
-        |word: WordN<_, 5>, selected_word: Rc<RefCell<Option<WordN<_, 5>>>>, rerender: UseStateHandle<()>| {
+        |word: WordN<_, 5>,
+         selected_word: Rc<RefCell<Option<WordN<_, 5>>>>,
+         rerender: UseStateHandle<()>| {
             Callback::from(move |_| {
                 *selected_word.borrow_mut() = Some(word.clone());
                 rerender.set(());

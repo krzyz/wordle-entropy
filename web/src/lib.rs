@@ -1,8 +1,8 @@
 #![recursion_limit = "1024"]
 #![allow(clippy::large_enum_variant)]
 
-pub mod main_app;
 mod components;
+pub mod main_app;
 mod pages;
 mod word_set;
 mod worker;

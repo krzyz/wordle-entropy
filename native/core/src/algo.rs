@@ -5,10 +5,7 @@ use itertools::izip;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
-pub fn get_hints<T, const N: usize>(
-    guess: &WordN<T, N>,
-    correct: &WordN<T, N>,
-) -> HintsN<N>
+pub fn get_hints<T, const N: usize>(guess: &WordN<T, N>, correct: &WordN<T, N>) -> HintsN<N>
 where
     T: Serialize + Copy + Eq,
     for<'de2> T: Deserialize<'de2>,
@@ -16,7 +13,6 @@ where
     let mut left = ArrayVec::<_, N>::new();
     get_hints_with_work_array(guess, correct, &mut left)
 }
-
 
 pub fn get_hints_with_work_array<T, const N: usize>(
     guess: &WordN<T, N>,
@@ -166,8 +162,8 @@ pub fn get_answers<const N: usize>(
 mod tests {
     use super::*;
     use crate::translator::Translator;
-    use std::str::FromStr;
     use rstest::rstest;
+    use std::str::FromStr;
 
     const WORDS_LENGTH: usize = 5;
 

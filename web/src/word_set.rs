@@ -1,11 +1,10 @@
+use crate::components::word_set_select::WordSetSelection;
 use bounce::prelude::*;
 use gloo_storage::{LocalStorage, Storage};
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
 use wordle_entropy_core::structs::{Dictionary, EntropiesData};
 use yew::Reducible;
-
-use crate::components::word_set_select::WordSetSelection;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct WordSet {

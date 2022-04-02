@@ -38,15 +38,18 @@ impl Worker for WordleWorker {
                 };
 
                 // the less the better
-                let left_diff = expected_turns(uncertainty - entropies_data.entropy, 0., 1.6369421, -0.029045254) * (1. - prob);
+                let left_diff = expected_turns(
+                    uncertainty - entropies_data.entropy,
+                    0.,
+                    1.6369421,
+                    -0.029045254,
+                ) * (1. - prob);
 
                 (entropies_data, left_diff)
             })
             .collect::<Vec<_>>();
 
-        scores.sort_by(|&(_, score1), &(_, score2)| {
-            score1.partial_cmp(&score2).unwrap_or(Equal)
-        });
+        scores.sort_by(|&(_, score1), &(_, score2)| score1.partial_cmp(&score2).unwrap_or(Equal));
 
         self.link.respond(id, (name, scores));
     }

@@ -2,7 +2,7 @@ use plotters::prelude::*;
 use plotters_canvas::CanvasBackend;
 use std::cmp::Ordering::Equal;
 use web_sys::HtmlCanvasElement;
-use yew::{functional::function_component, html, use_node_ref, Properties, use_effect};
+use yew::{functional::function_component, html, use_effect, use_node_ref, Properties};
 
 fn draw_plot(canvas: HtmlCanvasElement, data: &[f64]) -> Result<(), Box<dyn std::error::Error>> {
     let root = CanvasBackend::with_canvas_object(canvas)
@@ -45,7 +45,7 @@ fn draw_plot(canvas: HtmlCanvasElement, data: &[f64]) -> Result<(), Box<dyn std:
 
 #[derive(Properties, PartialEq)]
 pub struct Props {
-    pub data: Vec<f64>
+    pub data: Vec<f64>,
 }
 
 #[function_component(EntropyPlot)]

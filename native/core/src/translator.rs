@@ -1,7 +1,6 @@
-use fxhash::FxHashMap;
-use serde::{Serialize, Deserialize};
 use crate::structs::WordN;
-
+use fxhash::FxHashMap;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Translator {
@@ -26,7 +25,8 @@ impl Translator {
         }
 
         Self {
-            char_to_u8, u8_to_char
+            char_to_u8,
+            u8_to_char,
         }
     }
 

@@ -57,8 +57,6 @@ pub fn view() -> Html {
     }
 }
 
-
-
 fn switch(routes: &Route) -> Html {
     match routes.clone() {
         Route::Home | Route::WordSets => {
