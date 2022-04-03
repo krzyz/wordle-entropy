@@ -22,11 +22,19 @@ impl WordSet {
         }
     }
 
-    pub fn with_entropies(&self, entropies: Vec<(EntropiesData, f64)>) -> Self {
+    pub fn with_entropies(&self, entropies: Rc<Vec<(EntropiesData, f64)>>) -> Self {
         Self {
             name: self.name.clone(),
             dictionary: self.dictionary.clone(),
-            entropies: Some(Rc::new(entropies)),
+            entropies: Some(entropies),
+        }
+    }
+
+    pub fn without_entropies(&self) -> Self {
+        Self {
+            name: self.name.clone(),
+            dictionary: self.dictionary.clone(),
+            entropies: None,
         }
     }
 }
@@ -35,7 +43,7 @@ pub enum WordSetVecAction {
     Set(WordSetVec),
     Remove(String),
     LoadWords(String, Dictionary),
-    SetEntropy(String, Vec<(EntropiesData, f64)>),
+    SetEntropy(String, Rc<Vec<(EntropiesData, f64)>>),
 }
 
 #[derive(Clone, Debug, PartialEq, Slice, Serialize, Deserialize)]

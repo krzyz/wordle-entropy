@@ -1,87 +1,169 @@
 use crate::components::entropy_plot::EntropyPlot;
-use crate::word_set::get_current_word_set;
+use crate::word_set::{get_current_word_set, WordSet};
 use crate::word_set::{WordSetVec, WordSetVecAction};
-use crate::worker::WordleWorker;
-use crate::Word;
+use crate::worker::{WordleWorker, WordleWorkerInput, WordleWorkerOutput};
+use crate::{EntropiesData, Word};
 use bounce::use_slice_dispatch;
-use gloo_worker::{Bridged, Worker};
-use std::cell::RefCell;
+use gloo_worker::Bridged;
 use std::rc::Rc;
 use web_sys::HtmlInputElement;
-use yew::UseStateHandle;
 use yew::{
-    classes, events::Event, function_component, html, use_mut_ref, use_state, Callback, Html,
-    TargetCast,
+    classes, events::Event, function_component, html, use_effect_with_deps, use_mut_ref, use_state,
+    Callback, Html, Reducible, TargetCast,
 };
+use yew::{use_reducer, UseReducerHandle};
+
+enum EntropyStateAction {
+    ChangeSelected(Option<Word>, Rc<Vec<(EntropiesData, f64)>>, Option<bool>),
+    StartRunning,
+    StopRunning,
+}
+#[derive(Clone, PartialEq)]
+struct EntropyState {
+    running: bool,
+    word: Option<Word>,
+    data: Vec<f64>,
+}
+
+impl EntropyState {
+    fn new(word: Word, data: Vec<f64>, running: bool) -> Self {
+        Self {
+            running,
+            word: Some(word),
+            data,
+        }
+    }
+
+    fn empty() -> Self {
+        Self {
+            running: false,
+            word: None,
+            data: vec![],
+        }
+    }
+
+    fn with_running(&self, running: bool) -> Self {
+        let rest = (*self).clone();
+        Self { running, ..rest }
+    }
+}
+
+impl Reducible for EntropyState {
+    type Action = EntropyStateAction;
+
+    fn reduce(self: Rc<Self>, action: Self::Action) -> Rc<Self> {
+        match action {
+            EntropyStateAction::ChangeSelected(word, entropies, running) => {
+                if let Some(ref word) = word {
+                    let word_entropy = entropies
+                        .iter()
+                        .find(|&(entropies_data, _)| &entropies_data.word == word)
+                        .cloned();
+                    let data = word_entropy
+                        .map(|(entropies_data, _)| {
+                            entropies_data
+                                .probabilities
+                                .into_values()
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or(vec![]);
+
+                    Rc::new(Self::new(
+                        word.clone(),
+                        data,
+                        running.unwrap_or(self.running),
+                    ))
+                } else {
+                    Rc::new(Self::empty())
+                }
+            }
+            EntropyStateAction::StartRunning => Rc::new(self.with_running(true)),
+            EntropyStateAction::StopRunning => Rc::new(self.with_running(false)),
+        }
+    }
+}
 
 #[function_component(EntropyCalculation)]
 pub fn view() -> Html {
-    let word_set = get_current_word_set();
+    let word_set = Rc::new(get_current_word_set());
+
     let dispatch_word_sets = use_slice_dispatch::<WordSetVec>();
-    let selected_word = use_mut_ref(|| -> Option<Word> { None });
-    let running = use_state(|| false);
-    let rerender = use_state(|| ());
+    let selected_state = use_reducer::<EntropyState, _>(|| EntropyState::empty());
 
     let cb = {
-        let selected_word = selected_word.clone();
+        let selected_state = selected_state.clone();
         let dispatch_word_sets = dispatch_word_sets.clone();
-        let running = running.clone();
-        move |(name, entropies_output): <WordleWorker as Worker>::Output| {
-            running.set(false);
+        move |output: WordleWorkerOutput| match output {
+            WordleWorkerOutput::SetWordSet(name) => log::info!("Set worker with: {name}"),
+            WordleWorkerOutput::Entropy(name, entropies_output) => {
+                let entropies = Rc::new(entropies_output);
+                let word = entropies
+                    .iter()
+                    .next()
+                    .map(|(entropies_data, _)| Some(entropies_data.word.clone()));
+                if let Some(word) = word {
+                    selected_state.dispatch(EntropyStateAction::ChangeSelected(
+                        word,
+                        entropies.clone(),
+                        Some(false),
+                    ));
+                } else {
+                    selected_state.dispatch(EntropyStateAction::StopRunning);
+                }
 
-            if let Some((entropies_data, _)) = entropies_output.iter().next() {
-                *selected_word.borrow_mut() = Some(entropies_data.word.clone());
+                log::info!("Setting entropy: {}", name);
+                dispatch_word_sets(WordSetVecAction::SetEntropy(name, entropies));
             }
-
-            log::info!("Setting entropy: {}", name);
-            dispatch_word_sets(WordSetVecAction::SetEntropy(name, entropies_output));
+            WordleWorkerOutput::Err(error) => {
+                selected_state.dispatch(EntropyStateAction::StopRunning);
+                log::info!("{error}");
+            }
+            _ => log::info!("Unexpected worker output"),
         }
     };
 
-    let data = selected_word
-        .borrow()
-        .as_ref()
-        .map(|selected_word| {
-            let word_entropy = if let Some(entropies) = word_set.entropies.clone() {
-                entropies
-                    .iter()
-                    .find(|&(entropies_data, _)| &entropies_data.word == selected_word)
-                    .cloned()
-            } else {
-                None
-            };
-            word_entropy.map(|(entropies_data, _)| {
-                entropies_data
-                    .probabilities
-                    .into_values()
-                    .collect::<Vec<_>>()
-            })
-        })
-        .flatten()
-        .unwrap_or(vec![]);
-
     let worker = use_mut_ref(|| WordleWorker::bridge(Rc::new(cb)));
+
+    {
+        let worker = worker.clone();
+        let word_set = word_set.clone();
+        let word_set_name = word_set.name.clone();
+        use_effect_with_deps(
+            move |_| {
+                log::info!("send set work set");
+                worker.borrow_mut().send(WordleWorkerInput::SetWordSet(
+                    (*word_set).without_entropies(),
+                ));
+                log::info!("finished send");
+                || ()
+            },
+            word_set_name,
+        )
+    }
 
     let onclick_run = {
         let worker = worker.clone();
         let word_set = word_set.clone();
-        let running = running.clone();
+        let selected_state = selected_state.clone();
         Callback::from(move |_| {
             log::info!("run");
             log::info!("found dictionary of: {}", word_set.name);
             worker
                 .borrow_mut()
-                .send((word_set.name.clone(), (*word_set.dictionary).clone()));
+                .send(WordleWorkerInput::Entropy(word_set.name.clone()));
             log::info!("dictionary send");
-            running.set(true);
+            selected_state.dispatch(EntropyStateAction::StartRunning);
         })
     };
 
     let onclick_word = {
-        |word: Word, selected_word: Rc<RefCell<Option<Word>>>, rerender: UseStateHandle<()>| {
+        |word: Word, selected_state: UseReducerHandle<EntropyState>, word_set: Rc<WordSet>| {
             Callback::from(move |_| {
-                *selected_word.borrow_mut() = Some(word.clone());
-                rerender.set(());
+                selected_state.dispatch(EntropyStateAction::ChangeSelected(
+                    Some(word.clone()),
+                    word_set.entropies.clone().unwrap_or(Rc::new(vec![])),
+                    None,
+                ));
             })
         }
     };
@@ -97,15 +179,17 @@ pub fn view() -> Html {
         })
     };
 
-    let selected_word_val = selected_word.borrow().clone();
+    let selected_word_val = selected_state.word.clone();
+    let running = selected_state.running;
+    let data = selected_state.data.clone();
 
     html! {
         <div class="container">
             <div class="columns">
                 <div class="column col-6 col-mx-auto">
-                    <button class="btn btn-primary" disabled={*running} onclick={onclick_run}>{"Run"}</button>
+                    <button class="btn btn-primary" disabled={running} onclick={onclick_run}>{"Run"}</button>
                     {
-                        if *running {
+                        if running {
                             html!(<div class="d-inline-block loading p-2"></div>)
                         } else {
                             html!()
@@ -134,7 +218,7 @@ pub fn view() -> Html {
                                                     "c-hand",
                                                     (selected_word_val).clone().map(|selected_word| { *word == selected_word }).map(|is_selected| is_selected.then(|| Some("text-primary")))
                                                 )}
-                                                onclick={onclick_word(word.clone(), selected_word.clone(), rerender.clone())}
+                                                onclick={onclick_word(word.clone(), selected_state.clone(), word_set.clone())}
                                             >
                                                 {format!("{word}: {entropy}, {left_turns}")}
                                             </li>
