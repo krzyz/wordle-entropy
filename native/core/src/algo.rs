@@ -1,4 +1,6 @@
-use crate::structs::{Hint, HintsN, KnowledgeN, PartialChar, WordN};
+use crate::structs::{
+    hints::Hint, hints::HintsN, knowledge::KnowledgeN, knowledge::PartialChar, word::WordN,
+};
 use arrayvec::ArrayVec;
 use fxhash::FxHashMap;
 use itertools::izip;
@@ -178,8 +180,8 @@ mod tests {
     #[case("aabab", "bxaxx", "OWOWW")]
     #[case("cacbb", "abcba", "WOCCO")]
     fn hints_ok(#[case] guess: &str, #[case] answer: &str, #[case] expected: &str) {
-        let guess_w = Word::new(guess);
-        let answer_w = Word::new(answer);
+        let guess_w: Word = guess.try_into().unwrap();
+        let answer_w: Word = answer.try_into().unwrap();
         let translator = Translator::generate(&[guess_w.clone(), answer_w.clone()]);
         let guess_b = translator.to_bytes(&guess_w);
         let answer_b = translator.to_bytes(&answer_w);

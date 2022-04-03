@@ -5,7 +5,7 @@ use std::{cmp::Ordering::Equal, time::Instant};
 use crate::{
     algo::{get_answers, get_hints_and_update},
     entropy::calculate_entropies,
-    structs::{Dictionary, EntropiesData, HintsN, KnowledgeN, WordN},
+    structs::{hints::HintsN, knowledge::KnowledgeN, word::WordN, Dictionary, EntropiesData},
     util::print_vec,
 };
 

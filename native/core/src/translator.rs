@@ -1,4 +1,4 @@
-use crate::structs::WordN;
+use crate::structs::word::WordN;
 use fxhash::FxHashMap;
 use serde::{Deserialize, Serialize};
 

@@ -1,4 +1,5 @@
 use crate::word_set::{WordSet, WordSetVec, WordSetVecAction};
+use crate::WORD_SIZE;
 use bounce::{use_atom, use_slice, Atom};
 use reqwest::StatusCode;
 use wasm_bindgen_futures::spawn_local;
@@ -30,11 +31,11 @@ pub fn word_set_select() -> Html {
                     match response.status() {
                         StatusCode::OK => {
                             let text = response.text().await.unwrap();
-                            let dictionary = parse_words::<_, 5>(text.lines());
+                            let dictionary = parse_words::<_, WORD_SIZE>(text.lines());
                             word_sets.dispatch(WordSetVecAction::Set((*word_sets).extend_with(
                                 WordSet::from_dictionary(
                                     "Polish words scrabble".to_string(),
-                                    dictionary,
+                                    dictionary.unwrap(),
                                 ),
                             )));
                             log::info!("Loaded from url");

@@ -1,8 +1,8 @@
+use crate::{Dictionary, EntropiesData};
 use gloo_worker::{HandlerId, Public, Worker, WorkerLink};
 use std::cmp::Ordering::Equal;
 use wordle_entropy_core::entropy::calculate_entropies;
 use wordle_entropy_core::solvers::expected_turns;
-use wordle_entropy_core::structs::{Dictionary, EntropiesData};
 
 pub struct WordleWorker {
     link: WorkerLink<Self>,
@@ -11,8 +11,8 @@ pub struct WordleWorker {
 impl Worker for WordleWorker {
     type Reach = Public<Self>;
     type Message = ();
-    type Input = (String, Dictionary<5>);
-    type Output = (String, Vec<(EntropiesData<5>, f64)>);
+    type Input = (String, Dictionary);
+    type Output = (String, Vec<(EntropiesData, f64)>);
 
     fn create(link: WorkerLink<Self>) -> Self {
         Self { link }

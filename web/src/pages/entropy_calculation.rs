@@ -2,12 +2,12 @@ use crate::components::entropy_plot::EntropyPlot;
 use crate::word_set::get_current_word_set;
 use crate::word_set::{WordSetVec, WordSetVecAction};
 use crate::worker::WordleWorker;
+use crate::Word;
 use bounce::use_slice_dispatch;
 use gloo_worker::{Bridged, Worker};
 use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::HtmlInputElement;
-use wordle_entropy_core::structs::WordN;
 use yew::UseStateHandle;
 use yew::{
     classes, events::Event, function_component, html, use_mut_ref, use_state, Callback, Html,
@@ -18,7 +18,7 @@ use yew::{
 pub fn view() -> Html {
     let word_set = get_current_word_set();
     let dispatch_word_sets = use_slice_dispatch::<WordSetVec>();
-    let selected_word = use_mut_ref(|| -> Option<WordN<char, 5>> { None });
+    let selected_word = use_mut_ref(|| -> Option<Word> { None });
     let running = use_state(|| false);
     let rerender = use_state(|| ());
 
@@ -71,16 +71,14 @@ pub fn view() -> Html {
             log::info!("found dictionary of: {}", word_set.name);
             worker
                 .borrow_mut()
-                .send((word_set.name.clone(), word_set.dictionary.clone()));
+                .send((word_set.name.clone(), (*word_set.dictionary).clone()));
             log::info!("dictionary send");
             running.set(true);
         })
     };
 
     let onclick_word = {
-        |word: WordN<_, 5>,
-         selected_word: Rc<RefCell<Option<WordN<_, 5>>>>,
-         rerender: UseStateHandle<()>| {
+        |word: Word, selected_word: Rc<RefCell<Option<Word>>>, rerender: UseStateHandle<()>| {
             Callback::from(move |_| {
                 *selected_word.borrow_mut() = Some(word.clone());
                 rerender.set(());

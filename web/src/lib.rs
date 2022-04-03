@@ -10,7 +10,11 @@ mod worker;
 use gloo_worker::PublicWorker;
 use wasm_bindgen::prelude::*;
 pub use wasm_bindgen_rayon::init_thread_pool;
-//use yew_agent::Threaded;
+
+const WORD_SIZE: usize = 5;
+pub type Word = wordle_entropy_core::structs::WordN<char, WORD_SIZE>;
+pub type Dictionary = wordle_entropy_core::structs::Dictionary<WORD_SIZE>;
+pub type EntropiesData = wordle_entropy_core::structs::EntropiesData<WORD_SIZE>;
 
 #[wasm_bindgen(start)]
 pub fn start() {

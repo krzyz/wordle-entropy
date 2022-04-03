@@ -1,6 +1,7 @@
 use crate::{
     main_app::Route,
     word_set::{WordSetVec, WordSetVecAction},
+    WORD_SIZE,
 };
 use bounce::{use_slice, use_slice_dispatch};
 use gloo_file::callbacks::read_as_text;
@@ -38,9 +39,10 @@ pub fn form() -> Html {
                         *file_reader.borrow_mut() =
                             Some(read_as_text(&file, move |res| match res {
                                 Ok(content) => {
-                                    let dictionary = parse_words::<_, 5>(content.lines());
+                                    let dictionary = parse_words::<_, WORD_SIZE>(content.lines());
                                     dispatch_word_set(WordSetVecAction::LoadWords(
-                                        name, dictionary,
+                                        name,
+                                        dictionary.unwrap(),
                                     ));
                                 }
                                 Err(err) => {

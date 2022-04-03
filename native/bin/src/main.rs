@@ -8,7 +8,7 @@ use we_core::algo;
 use we_core::data;
 use we_core::entropy::calculate_entropies;
 use we_core::solvers::{solve, solve_random};
-use we_core::structs::{KnowledgeN, WordN};
+use we_core::structs::{knowledge::KnowledgeN, word::WordN};
 use wordle_entropy_core as we_core;
 
 //const WORDS_PATH: &str = "/home/krzyz/projects/data/words_polish.txt";

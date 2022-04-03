@@ -1,32 +1,32 @@
 use crate::components::word_set_select::WordSetSelection;
+use crate::{Dictionary, EntropiesData};
 use bounce::prelude::*;
 use gloo_storage::{LocalStorage, Storage};
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
-use wordle_entropy_core::structs::{Dictionary, EntropiesData};
 use yew::Reducible;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct WordSet {
     pub name: String,
-    pub dictionary: Dictionary<5>,
-    pub entropies: Option<Vec<(EntropiesData<5>, f64)>>,
+    pub dictionary: Rc<Dictionary>,
+    pub entropies: Option<Rc<Vec<(EntropiesData, f64)>>>,
 }
 
 impl WordSet {
-    pub fn from_dictionary(name: String, dictionary: Dictionary<5>) -> Self {
+    pub fn from_dictionary(name: String, dictionary: Dictionary) -> Self {
         Self {
             name,
-            dictionary,
+            dictionary: Rc::new(dictionary),
             entropies: None,
         }
     }
 
-    pub fn with_entropies(&self, entropies: Vec<(EntropiesData<5>, f64)>) -> Self {
+    pub fn with_entropies(&self, entropies: Vec<(EntropiesData, f64)>) -> Self {
         Self {
             name: self.name.clone(),
             dictionary: self.dictionary.clone(),
-            entropies: Some(entropies),
+            entropies: Some(Rc::new(entropies)),
         }
     }
 }
@@ -34,8 +34,8 @@ impl WordSet {
 pub enum WordSetVecAction {
     Set(WordSetVec),
     Remove(String),
-    LoadWords(String, Dictionary<5>),
-    SetEntropy(String, Vec<(EntropiesData<5>, f64)>),
+    LoadWords(String, Dictionary),
+    SetEntropy(String, Vec<(EntropiesData, f64)>),
 }
 
 #[derive(Clone, Debug, PartialEq, Slice, Serialize, Deserialize)]
