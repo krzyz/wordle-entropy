@@ -1,17 +1,19 @@
+use std::rc::Rc;
+
+use bounce::use_slice_dispatch;
+use web_sys::HtmlInputElement;
+use yew::{
+    classes, events::Event, function_component, html, use_effect_with_deps, use_state, Callback,
+    Html, Reducible, TargetCast,
+};
+use yew::{use_reducer, UseReducerHandle};
+
 use crate::components::entropy_plot::EntropyPlot;
 use crate::word_set::{get_current_word_set, WordSet};
 use crate::word_set::{WordSetVec, WordSetVecAction};
-use crate::worker::{WordleWorker, WordleWorkerInput, WordleWorkerOutput};
+use crate::worker::{WordleWorkerInput, WordleWorkerOutput};
+use crate::worker_atom::WordleWorkerAtom;
 use crate::{EntropiesData, Word};
-use bounce::use_slice_dispatch;
-use gloo_worker::Bridged;
-use std::rc::Rc;
-use web_sys::HtmlInputElement;
-use yew::{
-    classes, events::Event, function_component, html, use_effect_with_deps, use_mut_ref, use_state,
-    Callback, Html, Reducible, TargetCast,
-};
-use yew::{use_reducer, UseReducerHandle};
 
 enum EntropyStateAction {
     ChangeSelected(Option<Word>, Rc<Vec<(EntropiesData, f64)>>, Option<bool>),
@@ -122,7 +124,7 @@ pub fn view() -> Html {
         }
     };
 
-    let worker = use_mut_ref(|| WordleWorker::bridge(Rc::new(cb)));
+    let worker = WordleWorkerAtom::with_callback(Rc::new(cb));
 
     {
         let worker = worker.clone();
@@ -131,7 +133,7 @@ pub fn view() -> Html {
         use_effect_with_deps(
             move |_| {
                 log::info!("send set work set");
-                worker.borrow_mut().send(WordleWorkerInput::SetWordSet(
+                worker.send(WordleWorkerInput::SetWordSet(
                     (*word_set).without_entropies(),
                 ));
                 log::info!("finished send");
@@ -148,9 +150,7 @@ pub fn view() -> Html {
         Callback::from(move |_| {
             log::info!("run");
             log::info!("found dictionary of: {}", word_set.name);
-            worker
-                .borrow_mut()
-                .send(WordleWorkerInput::Entropy(word_set.name.clone()));
+            worker.send(WordleWorkerInput::Entropy(word_set.name.clone()));
             log::info!("dictionary send");
             selected_state.dispatch(EntropyStateAction::StartRunning);
         })

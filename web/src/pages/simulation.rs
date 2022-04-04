@@ -1,6 +1,11 @@
+use std::rc::Rc;
+
+use yew::{function_component, html, use_mut_ref, Callback};
+
 use crate::components::select_words::{SelectWords, SelectedWords};
 use crate::word_set::get_current_word_set;
-use yew::{function_component, html, use_mut_ref, Callback};
+use crate::worker::WordleWorkerOutput;
+use crate::worker_atom::WordleWorkerAtom;
 
 #[function_component(Simulation)]
 pub fn view() -> Html {
@@ -20,6 +25,14 @@ pub fn view() -> Html {
             log::info!("{:#?}", *selected_words.borrow());
         })
     };
+
+    let cb = {
+        move |output: WordleWorkerOutput| match output {
+            _ => log::info!("Unexpected worker output"),
+        }
+    };
+
+    let worker = WordleWorkerAtom::with_callback(Rc::new(cb));
 
     html! {
         <section>

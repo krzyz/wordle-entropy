@@ -6,6 +6,7 @@ pub mod main_app;
 mod pages;
 mod word_set;
 mod worker;
+mod worker_atom;
 
 use gloo_worker::PublicWorker;
 use wasm_bindgen::prelude::*;
