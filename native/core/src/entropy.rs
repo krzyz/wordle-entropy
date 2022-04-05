@@ -3,9 +3,11 @@ use fxhash::FxHashMap;
 use ndarray::Array1;
 #[cfg(feature = "parallel")]
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use std::cmp::Ordering::Equal;
 
 use crate::{
     algo,
+    solvers::expected_turns,
     structs::{Dictionary, EntropiesData},
 };
 
@@ -63,4 +65,39 @@ pub fn calculate_entropies<const N: usize>(
         .collect::<Vec<_>>();
 
     entropies
+}
+
+pub fn entropies_scored<const N: usize>(
+    dictionary: &Dictionary<N>,
+    answers: &[usize],
+    entropies: Vec<EntropiesData<N>>,
+) -> Vec<(EntropiesData<N>, f64)> {
+    let uncertainty = (dictionary.words.len() as f64).log2();
+    let prob_norm: f64 = answers.iter().map(|&i| dictionary.probabilities[i]).sum();
+
+    let mut scores = entropies
+        .into_iter()
+        .enumerate()
+        .map(|(i, entropies_data)| {
+            let prob = if answers.contains(&i) {
+                dictionary.probabilities[i] / prob_norm
+            } else {
+                0.
+            };
+
+            // the less the better
+            let left_diff = expected_turns(
+                uncertainty - entropies_data.entropy,
+                0.,
+                1.6369421,
+                -0.029045254,
+            ) * (1. - prob);
+
+            (entropies_data, left_diff)
+        })
+        .collect::<Vec<_>>();
+
+    scores.sort_by(|&(_, score1), &(_, score2)| score1.partial_cmp(&score2).unwrap_or(Equal));
+
+    scores
 }

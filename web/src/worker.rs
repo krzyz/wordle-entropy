@@ -1,38 +1,38 @@
+use crate::simulation::{Simulation, SimulationInput, SimulationOutput};
 use crate::word_set::WordSet;
 use crate::EntropiesData;
 use anyhow::{anyhow, Result};
 use gloo_worker::{HandlerId, Public, Worker, WorkerLink};
 use serde::{Deserialize, Serialize};
-use std::cmp::Ordering::Equal;
-use wordle_entropy_core::entropy::calculate_entropies;
-use wordle_entropy_core::solvers::expected_turns;
 use serde_cbor::from_slice;
-
-#[derive(Serialize, Deserialize)]
-pub enum SimulationInput {}
+use std::rc::Rc;
+use wordle_entropy_core::entropy::{calculate_entropies, entropies_scored};
 
 #[derive(Serialize, Deserialize)]
 pub enum WordleWorkerInput {
+    CheckEntropies,
     SetWordSet(WordSet),
     SetWordSetEncoded(Vec<u8>),
     Entropy(String),
-    SimulationInput,
+    Simulation(SimulationInput),
 }
 
 #[derive(Serialize, Deserialize)]
-pub enum SimulationOutput {}
-
-#[derive(Serialize, Deserialize)]
 pub enum WordleWorkerOutput {
+    EntropyState {
+        name: Option<String>,
+        entropies: bool,
+    },
     SetWordSet(String),
     Entropy(String, Vec<(EntropiesData, f64)>),
-    SimulationOutput,
+    Simulation(SimulationOutput),
     Err(String),
 }
 
 pub struct WordleWorker {
     link: WorkerLink<Self>,
-    word_set: Option<WordSet>,
+    word_set: Option<Rc<WordSet>>,
+    simulation: Simulation,
 }
 
 impl WordleWorker {
@@ -44,49 +44,33 @@ impl WordleWorker {
         let answers = (0..dictionary.words.len()).collect::<Vec<_>>();
         let entropies = calculate_entropies(&dictionary, &answers);
 
-        let uncertainty = (dictionary.words.len() as f64).log2();
-        let prob_norm: f64 = answers.iter().map(|&i| dictionary.probabilities[i]).sum();
-
-        let mut scores = entropies
-            .into_iter()
-            .enumerate()
-            .map(|(i, entropies_data)| {
-                let prob = if answers.contains(&i) {
-                    dictionary.probabilities[i] / prob_norm
-                } else {
-                    0.
-                };
-
-                // the less the better
-                let left_diff = expected_turns(
-                    uncertainty - entropies_data.entropy,
-                    0.,
-                    1.6369421,
-                    -0.029045254,
-                ) * (1. - prob);
-
-                (entropies_data, left_diff)
-            })
-            .collect::<Vec<_>>();
-
-        scores.sort_by(|&(_, score1), &(_, score2)| score1.partial_cmp(&score2).unwrap_or(Equal));
+        let scores = entropies_scored(&dictionary, &answers, entropies);
 
         Ok(WordleWorkerOutput::Entropy(name.clone(), scores))
     }
 
     fn handle_set(&mut self, word_set: WordSet) -> Result<WordleWorkerOutput> {
         let name = word_set.name.clone();
-        self.word_set = Some(word_set);
+        self.word_set = Some(Rc::new(word_set));
         Ok(WordleWorkerOutput::SetWordSet(name))
     }
 
     fn handle_set_encoded(&mut self, word_set: Vec<u8>) -> Result<WordleWorkerOutput> {
         let word_set: WordSet = from_slice(&word_set[..]).unwrap();
         let name = word_set.name.clone();
-        self.word_set = Some(word_set);
+        self.word_set = Some(Rc::new(word_set));
         Ok(WordleWorkerOutput::SetWordSet(name))
     }
 
+    fn handle_check_entropies(&mut self) -> Result<WordleWorkerOutput> {
+        let name = self.word_set.as_ref().map(|w| w.name.clone());
+        let entropies = self
+            .word_set
+            .as_ref()
+            .map(|w| w.entropies.is_some())
+            .is_some();
+        Ok(WordleWorkerOutput::EntropyState { name, entropies })
+    }
 }
 
 impl Worker for WordleWorker {
@@ -99,6 +83,7 @@ impl Worker for WordleWorker {
         Self {
             link,
             word_set: None,
+            simulation: Simulation::default(),
         }
     }
 
@@ -106,10 +91,21 @@ impl Worker for WordleWorker {
 
     fn handle_input(&mut self, msg: Self::Input, id: HandlerId) {
         let result = match msg {
+            WordleWorkerInput::CheckEntropies => self.handle_check_entropies(),
             WordleWorkerInput::SetWordSet(word_set) => self.handle_set(word_set),
             WordleWorkerInput::SetWordSetEncoded(word_set) => self.handle_set_encoded(word_set),
             WordleWorkerInput::Entropy(name) => self.handle_entropy(&name),
-            _ => Err(anyhow!("unsupported message")),
+            WordleWorkerInput::Simulation(input) => {
+                if let Some(word_set) = self.word_set.as_ref() {
+                    self.simulation
+                        .handle_message(&word_set, input)
+                        .map(|output| WordleWorkerOutput::Simulation(output))
+                } else {
+                    Err(anyhow!(
+                        "Tried to start simulation, but word set is not set".to_string()
+                    ))
+                }
+            }
         };
         let output = match result {
             Ok(output) => output,

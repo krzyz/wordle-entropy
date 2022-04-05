@@ -4,6 +4,7 @@
 mod components;
 pub mod main_app;
 mod pages;
+mod simulation;
 mod word_set;
 mod worker;
 mod worker_atom;
@@ -16,6 +17,7 @@ const WORD_SIZE: usize = 5;
 pub type Word = wordle_entropy_core::structs::WordN<char, WORD_SIZE>;
 pub type Dictionary = wordle_entropy_core::structs::Dictionary<WORD_SIZE>;
 pub type EntropiesData = wordle_entropy_core::structs::EntropiesData<WORD_SIZE>;
+pub type Knowledge = wordle_entropy_core::structs::knowledge::KnowledgeN<WORD_SIZE>;
 
 #[wasm_bindgen(start)]
 pub fn start() {
