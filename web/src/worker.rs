@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering::Equal;
 use wordle_entropy_core::entropy::calculate_entropies;
 use wordle_entropy_core::solvers::expected_turns;
+use serde_cbor::from_slice;
 
 #[derive(Serialize, Deserialize)]
 pub enum SimulationInput {}
@@ -13,6 +14,7 @@ pub enum SimulationInput {}
 #[derive(Serialize, Deserialize)]
 pub enum WordleWorkerInput {
     SetWordSet(WordSet),
+    SetWordSetEncoded(Vec<u8>),
     Entropy(String),
     SimulationInput,
 }
@@ -77,6 +79,14 @@ impl WordleWorker {
         self.word_set = Some(word_set);
         Ok(WordleWorkerOutput::SetWordSet(name))
     }
+
+    fn handle_set_encoded(&mut self, word_set: Vec<u8>) -> Result<WordleWorkerOutput> {
+        let word_set: WordSet = from_slice(&word_set[..]).unwrap();
+        let name = word_set.name.clone();
+        self.word_set = Some(word_set);
+        Ok(WordleWorkerOutput::SetWordSet(name))
+    }
+
 }
 
 impl Worker for WordleWorker {
@@ -97,6 +107,7 @@ impl Worker for WordleWorker {
     fn handle_input(&mut self, msg: Self::Input, id: HandlerId) {
         let result = match msg {
             WordleWorkerInput::SetWordSet(word_set) => self.handle_set(word_set),
+            WordleWorkerInput::SetWordSetEncoded(word_set) => self.handle_set_encoded(word_set),
             WordleWorkerInput::Entropy(name) => self.handle_entropy(&name),
             _ => Err(anyhow!("unsupported message")),
         };
