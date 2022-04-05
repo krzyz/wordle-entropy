@@ -44,7 +44,7 @@ impl WordleWorker {
         let answers = (0..dictionary.words.len()).collect::<Vec<_>>();
         let entropies = calculate_entropies(&dictionary, &answers);
 
-        let scores = entropies_scored(&dictionary, &answers, entropies);
+        let scores = entropies_scored(&dictionary, &answers, entropies, None);
 
         Ok(WordleWorkerOutput::Entropy(name.clone(), scores))
     }

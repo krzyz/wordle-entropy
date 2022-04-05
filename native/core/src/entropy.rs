@@ -71,8 +71,12 @@ pub fn entropies_scored<const N: usize>(
     dictionary: &Dictionary<N>,
     answers: &[usize],
     entropies: Vec<EntropiesData<N>>,
+    uncertainty: Option<f64>,
 ) -> Vec<(EntropiesData<N>, f64)> {
-    let uncertainty = (dictionary.words.len() as f64).log2();
+    let uncertainty = match uncertainty {
+        Some(uncertainty) => uncertainty,
+        None => (dictionary.words.len() as f64).log2(),
+    };
     let prob_norm: f64 = answers.iter().map(|&i| dictionary.probabilities[i]).sum();
 
     let mut scores = entropies

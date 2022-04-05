@@ -37,6 +37,17 @@ impl WordSet {
             entropies: None,
         }
     }
+
+    pub fn reduce_entropies(&self, number_to_take: usize) -> Self {
+        Self {
+            name: self.name.clone(),
+            dictionary: self.dictionary.clone(),
+            entropies: self
+                .entropies
+                .as_ref()
+                .map(|e| Rc::new(e.iter().cloned().take(number_to_take).collect())),
+        }
+    }
 }
 
 pub enum WordSetVecAction {
