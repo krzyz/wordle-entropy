@@ -8,6 +8,7 @@ use yew::{
 };
 
 use crate::components::select_words::{SelectWords, SelectedWords};
+use crate::components::turns_plot::TurnsPlot;
 use crate::simulation::{SimulationInput, SimulationOutput};
 use crate::word_set::get_current_word_set;
 use crate::worker::{WordleWorkerInput, WordleWorkerOutput};
@@ -28,6 +29,8 @@ enum SimulationStateAction {
 
 #[derive(Clone, Default, PartialEq)]
 struct SimulationState {
+    current_turns: Vec<(f64, f64)>,
+    turns_data: Vec<(f64, f64)>,
     current_word: Option<Word>,
     last_hints: Option<Hints>,
     words_left: Vec<Word>,
@@ -39,6 +42,8 @@ impl Reducible for SimulationState {
     fn reduce(self: Rc<Self>, action: Self::Action) -> Rc<Self> {
         match action {
             SimulationStateAction::Initialize(word, words_left) => Rc::new(Self {
+                current_turns: vec![],
+                turns_data: vec![],
                 current_word: Some(word),
                 last_hints: None,
                 words_left,
@@ -52,16 +57,28 @@ impl Reducible for SimulationState {
                 answers,
             } => {
                 let mut words_left = self.words_left.clone();
+                let mut current_turns = self.current_turns.clone();
+                let mut turns_data = self.turns_data.clone();
                 let word = if answers.len() == 1 {
                     if words_left.len() > 0 {
                         words_left.remove(0);
                     }
+                    let turns_num = current_turns.len();
+                    turns_data.extend(
+                        current_turns
+                            .iter()
+                            .map(|&(uncertainty, turn)| (uncertainty, turns_num as f64 - turn)),
+                    );
+                    current_turns = vec![];
                     next_word
                 } else {
+                    current_turns.push((uncertainty, current_turns.len() as f64));
                     self.current_word.clone()
                 };
 
                 Rc::new(Self {
+                    current_turns,
+                    turns_data,
                     current_word: word,
                     last_hints: Some(hints),
                     words_left: words_left,
@@ -124,7 +141,7 @@ pub fn view() -> Html {
                     } else {
                         if words_left.borrow().len() > 0 {
                             let next_word = &words_left.borrow()[0];
-                            log::info!("Starting next word");
+                            log::info!("Starting next word: {next_word}");
                             *send_queue.borrow_mut() =
                                 Some(SimulationInput::Start(next_word.clone(), None));
                             Some(next_word.clone())
@@ -207,27 +224,37 @@ pub fn view() -> Html {
         })
     };
 
+    let data = simulation_state.turns_data.clone();
+    let words_len = word_set.dictionary.words.len();
+
     html! {
         <section>
             <SelectWords dictionary={word_set.dictionary.clone()} {on_words_set} />
             <button class="btn btn-primary" onclick={on_run_button_click}>{ "Run" }</button>
-            <div>
-                if let Some(ref word) = simulation_state.current_word {
-                    <p> { word } </p>
-                }
-                if let Some(ref hints) = simulation_state.last_hints {
-                    <p> { hints } </p>
-                }
-                <p> { "Left:" } </p>
-                <ul>
-                    {
-                        simulation_state.words_left.iter().map(|word| {
-                            html! {
-                                <li> { word } </li>
+            <div class="columns">
+                <div class="column">
+                    <TurnsPlot {data} {words_len} />
+                </div>
+                <div class="column">
+                    <div>
+                        if let Some(ref word) = simulation_state.current_word {
+                            <p> { word } </p>
+                        }
+                        if let Some(ref hints) = simulation_state.last_hints {
+                            <p> { hints } </p>
+                        }
+                        <p> { "Left:" } </p>
+                        <ul>
+                            {
+                                simulation_state.words_left.iter().map(|word| {
+                                    html! {
+                                        <li> { word } </li>
+                                    }
+                                }).collect::<Html>()
                             }
-                        }).collect::<Html>()
-                    }
-                </ul>
+                        </ul>
+                    </div>
+                </div>
             </div>
         </section>
     }

@@ -68,7 +68,7 @@ impl Simulation {
         input: SimulationInput,
     ) -> Result<SimulationOutput> {
         match input {
-            SimulationInput::Start(solution, guess) => self.handle_start(word_set, solution, guess),
+            SimulationInput::Start(correct, guess) => self.handle_start(word_set, correct, guess),
             SimulationInput::Continue(guess) => self.handle_continue(guess),
             SimulationInput::Stop => self.handle_stop(),
         }
