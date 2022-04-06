@@ -7,6 +7,7 @@ use yew::{
     Reducible,
 };
 
+use crate::components::hinted_word::HintedWord;
 use crate::components::select_words::{SelectWords, SelectedWords};
 use crate::components::turns_plot::TurnsPlot;
 use crate::simulation::{SimulationInput, SimulationOutput};
@@ -33,6 +34,7 @@ struct SimulationState {
     turns_data: Vec<(f64, f64)>,
     current_word: Option<Word>,
     last_hints: Option<Hints>,
+    last_guess: Option<Word>,
     words_left: Vec<Word>,
 }
 
@@ -46,6 +48,7 @@ impl Reducible for SimulationState {
                 turns_data: vec![],
                 current_word: Some(word),
                 last_hints: None,
+                last_guess: None,
                 words_left,
             }),
             SimulationStateAction::NextStep {
@@ -81,6 +84,7 @@ impl Reducible for SimulationState {
                     turns_data,
                     current_word: word,
                     last_hints: Some(hints),
+                    last_guess: Some(guess),
                     words_left: words_left,
                 })
             }
@@ -240,8 +244,8 @@ pub fn view() -> Html {
                         if let Some(ref word) = simulation_state.current_word {
                             <p> { word } </p>
                         }
-                        if let Some(ref hints) = simulation_state.last_hints {
-                            <p> { hints } </p>
+                        if let (Some(word), Some(hints)) = (simulation_state.last_guess.clone(), simulation_state.last_hints.clone()) {
+                            <p> <HintedWord {word} {hints} /></p>
                         }
                         <p> { "Left:" } </p>
                         <ul>

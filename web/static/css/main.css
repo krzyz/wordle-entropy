@@ -11,3 +11,29 @@ ul.words_entropies_list {
   overflow:hidden;
   overflow-y:scroll;
 }
+
+.char-block {
+  align-items: center;
+  box-sizing: border-box;
+  color: white;
+  display: inline-flex;
+  font-size: 32px;
+  font-weight: 700;
+  justify-content: center;
+  text-transform: uppercase;
+  line-height: 32px;
+  vertical-align: middle;
+  width: 62px;
+}
+
+.hint-wrong {
+  background-color: rgb(58, 58, 60);
+}
+
+.hint-out-of-place {
+  background-color: rgb(181, 159, 59);
+}
+
+.hint-correct {
+  background-color: rgb(83, 141, 78);
+}
