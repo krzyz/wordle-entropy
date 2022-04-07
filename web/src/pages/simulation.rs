@@ -11,13 +11,13 @@ use crate::components::hinted_word::HintedWord;
 use crate::components::select_words::{SelectWords, SelectedWords};
 use crate::components::turns_plot::TurnsPlot;
 use crate::simulation::{SimulationInput, SimulationOutput};
-use crate::word_set::get_current_word_set;
+use crate::word_set::{get_current_word_set, WordSet};
 use crate::worker::{WordleWorkerInput, WordleWorkerOutput};
 use crate::worker_atom::WordleWorkerAtom;
 use crate::{EntropiesData, Hints, Word};
 
 enum SimulationStateAction {
-    Initialize(Word, Vec<Word>),
+    Initialize(Word, Vec<Word>, Rc<WordSet>),
     NextStep {
         next_word: Option<Word>,
         guess: Word,
@@ -37,6 +37,7 @@ struct SimulationState {
     last_guess: Option<Word>,
     history: Vec<Vec<(Word, Hints, f64)>>,
     words_left: Vec<Word>,
+    word_set: Option<Rc<WordSet>>,
 }
 
 impl Reducible for SimulationState {
@@ -44,7 +45,7 @@ impl Reducible for SimulationState {
 
     fn reduce(self: Rc<Self>, action: Self::Action) -> Rc<Self> {
         match action {
-            SimulationStateAction::Initialize(word, words_left) => Rc::new(Self {
+            SimulationStateAction::Initialize(word, words_left, word_set) => Rc::new(Self {
                 current_turns: vec![],
                 turns_data: vec![],
                 current_word: Some(word),
@@ -52,6 +53,7 @@ impl Reducible for SimulationState {
                 last_guess: None,
                 history: vec![],
                 words_left,
+                word_set: Some(word_set),
             }),
             SimulationStateAction::NextStep {
                 next_word,
@@ -66,19 +68,28 @@ impl Reducible for SimulationState {
                 let mut turns_data = self.turns_data.clone();
                 let mut history = self.history.clone();
 
-                if let Some(history_last) = history.last_mut() {
-                    history_last.push((guess.clone(), hints.clone(), uncertainty));
+                let mut last_optn: Option<&mut Vec<(Word, Hints, f64)>>;
+                let history_last = if let Some(history_last) = history.last_mut() {
+                    history_last
                 } else {
                     history.push(vec![]);
-                    let history_last = &mut history.last_mut().unwrap();
-                    history_last.push((guess.clone(), hints.clone(), uncertainty));
+                    last_optn = history.last_mut();
+                    &mut **last_optn.as_mut().unwrap()
                 };
+                history_last.push((guess.clone(), hints.clone(), uncertainty));
 
                 let word = if answers.len() == 1 {
+                    let mut turns_num = current_turns.len();
+
+                    let correct_answer =
+                        &self.word_set.as_ref().unwrap().dictionary.words[answers[0]];
+                    if correct_answer != &guess {
+                        history_last.push((correct_answer.clone(), Hints::correct(), 0.));
+                        turns_num += 1;
+                    }
                     if words_left.len() > 0 {
                         words_left.remove(0);
                     }
-                    let turns_num = current_turns.len();
                     turns_data.extend(
                         current_turns
                             .iter()
@@ -100,6 +111,7 @@ impl Reducible for SimulationState {
                     last_guess: Some(guess),
                     history,
                     words_left: words_left,
+                    word_set: self.word_set.clone(),
                 })
             }
         }
@@ -215,6 +227,7 @@ pub fn view() -> Html {
         let word_set = word_set.clone();
         let selected_words = selected_words.clone();
         let simulation_state = simulation_state.clone();
+        let word_set = word_set.clone();
 
         Callback::from(move |_| {
             let mut words = match *selected_words.borrow() {
@@ -232,7 +245,11 @@ pub fn view() -> Html {
 
             if words.len() > 0 {
                 let word = words.remove(0);
-                simulation_state.dispatch(SimulationStateAction::Initialize(word.clone(), words));
+                simulation_state.dispatch(SimulationStateAction::Initialize(
+                    word.clone(),
+                    words,
+                    word_set.clone(),
+                ));
                 worker.send(WordleWorkerInput::Simulation(SimulationInput::Start(
                     word, None,
                 )));
