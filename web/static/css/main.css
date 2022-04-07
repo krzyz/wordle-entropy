@@ -12,18 +12,26 @@ ul.words_entropies_list {
   overflow-y:scroll;
 }
 
+ul.words_left_list {
+  height: 400px;
+  overflow:hidden;
+  overflow-y:scroll;
+}
+
 .char-block {
   align-items: center;
   box-sizing: border-box;
   color: white;
   display: inline-flex;
-  font-size: 32px;
+  font-size: 10px;
   font-weight: 700;
   justify-content: center;
   text-transform: uppercase;
-  line-height: 32px;
+  line-height: 10px;
   vertical-align: middle;
-  width: 62px;
+  width: 20px;
+  height: 20px;
+  margin: 2px;
 }
 
 .hint-wrong {

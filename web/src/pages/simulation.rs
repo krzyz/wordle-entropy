@@ -35,6 +35,7 @@ struct SimulationState {
     current_word: Option<Word>,
     last_hints: Option<Hints>,
     last_guess: Option<Word>,
+    history: Vec<Vec<(Word, Hints, f64)>>,
     words_left: Vec<Word>,
 }
 
@@ -49,6 +50,7 @@ impl Reducible for SimulationState {
                 current_word: Some(word),
                 last_hints: None,
                 last_guess: None,
+                history: vec![],
                 words_left,
             }),
             SimulationStateAction::NextStep {
@@ -62,6 +64,16 @@ impl Reducible for SimulationState {
                 let mut words_left = self.words_left.clone();
                 let mut current_turns = self.current_turns.clone();
                 let mut turns_data = self.turns_data.clone();
+                let mut history = self.history.clone();
+
+                if let Some(history_last) = history.last_mut() {
+                    history_last.push((guess.clone(), hints.clone(), uncertainty));
+                } else {
+                    history.push(vec![]);
+                    let history_last = &mut history.last_mut().unwrap();
+                    history_last.push((guess.clone(), hints.clone(), uncertainty));
+                };
+
                 let word = if answers.len() == 1 {
                     if words_left.len() > 0 {
                         words_left.remove(0);
@@ -73,6 +85,7 @@ impl Reducible for SimulationState {
                             .map(|&(uncertainty, turn)| (uncertainty, turns_num as f64 - turn)),
                     );
                     current_turns = vec![];
+                    history.push(vec![]);
                     next_word
                 } else {
                     current_turns.push((uncertainty, current_turns.len() as f64));
@@ -85,6 +98,7 @@ impl Reducible for SimulationState {
                     current_word: word,
                     last_hints: Some(hints),
                     last_guess: Some(guess),
+                    history,
                     words_left: words_left,
                 })
             }
@@ -248,7 +262,7 @@ pub fn view() -> Html {
                             <p> <HintedWord {word} {hints} /></p>
                         }
                         <p> { "Left:" } </p>
-                        <ul>
+                        <ul class="words_left_list">
                             {
                                 simulation_state.words_left.iter().map(|word| {
                                     html! {
@@ -259,6 +273,29 @@ pub fn view() -> Html {
                         </ul>
                     </div>
                 </div>
+            </div>
+            <div>
+                {
+                    simulation_state.history.iter().map(|row| {
+                        html! {
+                            <p>
+                                {
+                                    row.iter().map(|(word, hints, _uncertainty)| {
+                                        let word = word.clone();
+                                        let hints = hints.clone();
+                                        html! {
+                                            <>
+                                                <HintedWord {word} {hints} />
+                                                <div style="display: inline" class="m-2" />
+                                                <div style="display: inline" class="m-2" />
+                                            </>
+                                        }
+                                    }).collect::<Html>()
+                                }
+                            </p>
+                        }
+                    }).collect::<Html>()
+                }
             </div>
         </section>
     }
