@@ -1,15 +1,15 @@
 use std::rc::Rc;
 
 use bounce::use_slice_dispatch;
-use web_sys::HtmlInputElement;
+use web_sys::{HtmlElement, HtmlInputElement};
 use yew::{
     classes, events::Event, function_component, html, use_effect_with_deps, use_state, Callback,
     Html, Reducible, TargetCast,
 };
-use yew::{use_reducer, UseReducerHandle};
+use yew::{use_reducer, MouseEvent};
 
 use crate::components::entropy_plot::EntropyPlot;
-use crate::word_set::{get_current_word_set, WordSet};
+use crate::word_set::get_current_word_set;
 use crate::word_set::{WordSetVec, WordSetVecAction};
 use crate::worker::{WordleWorkerInput, WordleWorkerOutput};
 use crate::worker_atom::WordleWorkerAtom;
@@ -157,15 +157,20 @@ pub fn view() -> Html {
     };
 
     let onclick_word = {
-        |word: Word, selected_state: UseReducerHandle<EntropyState>, word_set: Rc<WordSet>| {
-            Callback::from(move |_| {
+        let word_set = word_set.clone();
+        let selected_state = selected_state.clone();
+        Callback::from(move |e: MouseEvent| {
+            let element: HtmlElement = e.target_unchecked_into();
+            if let Some(word) = element.dataset().get("word") {
                 selected_state.dispatch(EntropyStateAction::ChangeSelected(
-                    Some(word.clone()),
+                    Some(word.as_str().try_into().unwrap()),
                     word_set.entropies.clone().unwrap_or(Rc::new(vec![])),
                     None,
                 ));
-            })
-        }
+            } else {
+                log::info!("Word list element doesn't refer to any word (expected data-word attriubute set");
+            }
+        })
     };
 
     let max_words_shown = use_state(|| 10);
@@ -204,7 +209,7 @@ pub fn view() -> Html {
                 <div class="column">
                     <label for="max_words_shown_input">{"Max words shown:"}</label>
                     <input id="max_words_shown_input" onchange={on_max_words_shown_change} value={(*max_words_shown).to_string()}/>
-                    <ul class="words_entropies_list">
+                    <ul class="words_entropies_list" onclick={onclick_word}>
                         {
                             if let Some(ref entropies) = word_set.entropies {
                                 entropies
@@ -214,11 +219,11 @@ pub fn view() -> Html {
                                         html! {
                                             <li
                                                 key={format!("{word}")}
+                                                data-word={format!("{word}")}
                                                 class={classes!(
                                                     "c-hand",
                                                     (selected_word_val).clone().map(|selected_word| { *word == selected_word }).map(|is_selected| is_selected.then(|| Some("text-primary")))
                                                 )}
-                                                onclick={onclick_word(word.clone(), selected_state.clone(), word_set.clone())}
                                             >
                                                 {format!("{word}: {entropy}, {left_turns}")}
                                             </li>

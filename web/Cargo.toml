@@ -43,6 +43,8 @@ num = "0.4.0"
 [dependencies.web-sys]
 version = "0.3.56"
 features = [
+  'DomStringMap',
+  'HtmlElement',
   'HtmlCanvasElement',
   'KeyboardEvent',
   'Navigator',
