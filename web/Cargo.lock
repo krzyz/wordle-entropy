@@ -2389,9 +2389,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bounce",
+ "gloo-events 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "gloo-file 0.2.1 (git+https://github.com/krzyz/gloo)",
  "gloo-storage",
  "gloo-timers 0.2.3 (git+https://github.com/krzyz/gloo)",
+ "gloo-utils 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "gloo-worker",
  "hsl",
  "js-sys",

@@ -18,6 +18,12 @@ ul.words_left_list {
   overflow-y:scroll;
 }
 
+.fill-space {
+  max-height: 800px;
+  width: 100%;
+  width: 100%;
+}
+
 .char-block {
   align-items: center;
   box-sizing: border-box;

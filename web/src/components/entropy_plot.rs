@@ -1,8 +1,12 @@
+use gloo_events::EventListener;
 use plotters::prelude::*;
 use plotters_canvas::CanvasBackend;
 use std::cmp::Ordering::Equal;
 use web_sys::HtmlCanvasElement;
-use yew::{functional::function_component, html, use_effect, use_node_ref, Properties};
+use yew::{
+    functional::function_component, html, use_effect, use_effect_with_deps, use_node_ref,
+    use_state, Properties,
+};
 
 fn draw_plot(canvas: HtmlCanvasElement, data: &[f64]) -> Result<(), Box<dyn std::error::Error>> {
     let root = CanvasBackend::with_canvas_object(canvas)
@@ -52,6 +56,30 @@ pub struct Props {
 pub fn view(props: &Props) -> Html {
     let canvas_node_ref = use_node_ref();
     let data = props.data.clone();
+    let canvas_size = use_state(|| (700., 400.));
+
+    {
+        let canvas_node_ref = canvas_node_ref.clone();
+        let canvas_size = canvas_size.clone();
+
+        use_effect_with_deps(
+            move |_| {
+                log::info!("register_event_listener");
+                let listener = EventListener::new(&gloo_utils::window(), "resize", move |_| {
+                    let canvas = canvas_node_ref.cast::<HtmlCanvasElement>().unwrap();
+
+                    let dom_rect = canvas.get_bounding_client_rect();
+
+                    log::info!("set size: {}, {}", dom_rect.width(), dom_rect.height());
+
+                    canvas_size.set((dom_rect.width(), dom_rect.height()));
+                });
+
+                move || drop(listener)
+            },
+            (),
+        );
+    }
 
     {
         let canvas_node_ref = canvas_node_ref.clone();
@@ -63,6 +91,6 @@ pub fn view(props: &Props) -> Html {
     }
 
     html! {
-        <canvas ref={canvas_node_ref} id="canvas" width="800" height="400" />
+        <canvas class="fill-space" ref={canvas_node_ref} id="canvas" width={format!("{}", canvas_size.0)} height={format!("{}", canvas_size.1)} />
     }
 }

@@ -167,8 +167,6 @@ pub fn view() -> Html {
                     word_set.entropies.clone().unwrap_or(Rc::new(vec![])),
                     None,
                 ));
-            } else {
-                log::info!("Word list element doesn't refer to any word (expected data-word attriubute set");
             }
         })
     };
@@ -203,13 +201,22 @@ pub fn view() -> Html {
                 </div>
             </div>
             <div class="columns">
-                <div class="column">
+                <div class="column col-6 col-md-12">
                     <EntropyPlot {data} />
                 </div>
-                <div class="column">
+                <div class="column col-6 col-md-12">
                     <label for="max_words_shown_input">{"Max words shown:"}</label>
                     <input id="max_words_shown_input" onchange={on_max_words_shown_change} value={(*max_words_shown).to_string()}/>
-                    <ul class="words_entropies_list" onclick={onclick_word}>
+                    <table class="table words_entropies_list" onclick={onclick_word}>
+                        <thead>
+                            <tr>
+                                <th>{"Word"}</th>
+                                <th>{"Exp. Entropy"}</th>
+                                <th>{"Exp. Turns left"}</th>
+                                <th>{"Rel. Probability"}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
                         {
                             if let Some(ref entropies) = word_set.entropies {
                                 entropies
@@ -217,23 +224,26 @@ pub fn view() -> Html {
                                         let word = &entropy_data.word;
                                         let entropy = &entropy_data.entropy;
                                         html! {
-                                            <li
+                                            <tr
                                                 key={format!("{word}")}
-                                                data-word={format!("{word}")}
                                                 class={classes!(
                                                     "c-hand",
                                                     (selected_word_val).clone().map(|selected_word| { *word == selected_word }).map(|is_selected| is_selected.then(|| Some("text-primary")))
                                                 )}
                                             >
-                                                {format!("{word}: {entropy}, {left_turns}")}
-                                            </li>
+                                                <td data-word={format!("{word}")}> { word }</td>
+                                                <td data-word={format!("{word}")}> { format!("{entropy:.3}") } </td>
+                                                <td data-word={format!("{word}")}> { format!("{left_turns:.3}") } </td>
+                                                <td data-word={format!("{word}")}> { "??" } </td>
+                                            </tr>
                                         }
                                     }).collect::<Html>()
                             } else {
                                 html! {<> </>}
                             }
                         }
-                    </ul>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
