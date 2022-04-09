@@ -4,8 +4,7 @@ use plotters_canvas::CanvasBackend;
 use std::cmp::Ordering::Equal;
 use web_sys::HtmlCanvasElement;
 use yew::{
-    functional::function_component, html, use_effect, use_effect_with_deps, use_node_ref,
-    use_state, Properties,
+    functional::function_component, html, use_effect, use_node_ref, use_state_eq, Properties,
 };
 
 fn draw_plot(canvas: HtmlCanvasElement, data: &[f64]) -> Result<(), Box<dyn std::error::Error>> {
@@ -23,7 +22,7 @@ fn draw_plot(canvas: HtmlCanvasElement, data: &[f64]) -> Result<(), Box<dyn std:
 
     let mut chart = ChartBuilder::on(&root)
         .x_label_area_size(35u32)
-        .y_label_area_size(40u32)
+        .y_label_area_size(60u32)
         .margin(8u32)
         .build_cartesian_2d((0..data.len()).into_segmented(), 0.0..y_max)?;
 
@@ -33,6 +32,7 @@ fn draw_plot(canvas: HtmlCanvasElement, data: &[f64]) -> Result<(), Box<dyn std:
         .bold_line_style(&WHITE.mix(0.3))
         .disable_x_axis()
         .y_desc("probability")
+        .x_desc("hints")
         .axis_desc_style(("sans-serif", 15u32))
         .draw()?;
 
@@ -56,37 +56,31 @@ pub struct Props {
 pub fn view(props: &Props) -> Html {
     let canvas_node_ref = use_node_ref();
     let data = props.data.clone();
-    let canvas_size = use_state(|| (700., 400.));
+    let canvas_size = use_state_eq(|| (700., 400.));
 
     {
         let canvas_node_ref = canvas_node_ref.clone();
         let canvas_size = canvas_size.clone();
 
-        use_effect_with_deps(
-            move |_| {
-                log::info!("register_event_listener");
-                let listener = EventListener::new(&gloo_utils::window(), "resize", move |_| {
-                    let canvas = canvas_node_ref.cast::<HtmlCanvasElement>().unwrap();
-
-                    let dom_rect = canvas.get_bounding_client_rect();
-
-                    log::info!("set size: {}, {}", dom_rect.width(), dom_rect.height());
-
-                    canvas_size.set((dom_rect.width(), dom_rect.height()));
-                });
-
-                move || drop(listener)
-            },
-            (),
-        );
-    }
-
-    {
-        let canvas_node_ref = canvas_node_ref.clone();
         use_effect(move || {
+            log::info!("register_event_listener");
+
+            let listener = {
+                let canvas_node_ref = canvas_node_ref.clone();
+                let canvas_size = canvas_size.clone();
+                EventListener::new(&gloo_utils::window(), "resize", move |_| {
+                    let canvas = canvas_node_ref.cast::<HtmlCanvasElement>().unwrap();
+                    let dom_rect = canvas.get_bounding_client_rect();
+                    canvas_size.set((dom_rect.width(), dom_rect.height()));
+                })
+            };
+
             let canvas = canvas_node_ref.cast::<HtmlCanvasElement>().unwrap();
+            let dom_rect = canvas.get_bounding_client_rect();
+            canvas_size.set((dom_rect.width(), dom_rect.height()));
             draw_plot(canvas, &data[..]).unwrap();
-            || ()
+
+            move || drop(listener)
         });
     }
 

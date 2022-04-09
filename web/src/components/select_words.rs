@@ -70,7 +70,7 @@ pub fn view(props: &Props) -> Html {
                 .parse::<usize>()
                 .map_err(|e| e.into())
                 .and_then(|value| {
-                    if value >= max_words {
+                    if value > max_words {
                         Err(anyhow!("There are only {max_words} words to choose from!"))
                     } else {
                         Ok(value)
