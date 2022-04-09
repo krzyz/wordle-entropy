@@ -3,8 +3,8 @@ use std::rc::Rc;
 use rand::{seq::IteratorRandom, thread_rng};
 use serde_cbor::ser::to_vec_packed;
 use yew::{
-    function_component, html, use_effect_with_deps, use_mut_ref, use_reducer, Callback, Html,
-    Reducible,
+    function_component, html, use_effect_with_deps, use_mut_ref, use_reducer, use_state, Callback,
+    Html, Reducible,
 };
 
 use crate::components::hinted_word::HintedWord;
@@ -124,6 +124,8 @@ pub fn view() -> Html {
     let selected_words = use_mut_ref(|| SelectedWords::Random(10));
 
     let simulation_state = use_reducer(|| SimulationState::default());
+    let stepping = use_mut_ref(|| false);
+    let next_step = use_state(|| false);
     let send_queue = use_mut_ref(|| -> Option<SimulationInput> { None });
     let words_left = use_mut_ref(|| -> Vec<Word> { vec![] });
     *words_left.borrow_mut() = simulation_state.words_left.clone();
@@ -157,23 +159,28 @@ pub fn view() -> Html {
                         })
                         .collect::<Vec<_>>()
                         .join(", ");
-                    log::info!(
-                        "{guess}, {hints}, {uncertainty}, {words}, {:#?}",
-                        answers.iter().take(10).collect::<Vec<_>>()
-                    );
 
                     let next_guess = scores.iter().next().unwrap().0.word.clone();
 
                     let next_word = if answers.len() > 1 {
-                        *send_queue.borrow_mut() =
-                            Some(SimulationInput::Continue(Some(next_guess)));
+                        match send_queue.try_borrow_mut() {
+                            Ok(ref mut send_queue) => {
+                                **send_queue = Some(SimulationInput::Continue(Some(next_guess)));
+                            }
+                            _ => log::info!("Unable to borrow in worker callback 1"),
+                        }
                         None
                     } else {
                         if words_left.borrow().len() > 0 {
                             let next_word = &words_left.borrow()[0];
                             log::info!("Starting next word: {next_word}");
-                            *send_queue.borrow_mut() =
-                                Some(SimulationInput::Start(next_word.clone(), None));
+                            match send_queue.try_borrow_mut() {
+                                Ok(ref mut send_queue) => {
+                                    **send_queue =
+                                        Some(SimulationInput::Start(next_word.clone(), None));
+                                }
+                                _ => log::info!("Unable to borrow in worker callback 2"),
+                            }
                             Some(next_word.clone())
                         } else {
                             None
@@ -200,9 +207,16 @@ pub fn view() -> Html {
 
     let worker = WordleWorkerAtom::with_callback(Rc::new(cb));
 
-    if let Some(input) = send_queue.borrow_mut().take() {
-        let worker = worker.clone();
-        worker.send(WordleWorkerInput::Simulation(input));
+    if !*stepping.borrow() || *next_step {
+        match send_queue.try_borrow_mut() {
+            Ok(ref mut send_queue) => {
+                if let Some(input) = send_queue.take() {
+                    worker.send(WordleWorkerInput::Simulation(input));
+                    next_step.set(false);
+                }
+            }
+            _ => log::info!("unable to borrow in queue resolution"),
+        }
     }
 
     {
@@ -211,18 +225,17 @@ pub fn view() -> Html {
         let word_set_name = word_set.name.clone();
         use_effect_with_deps(
             move |_| {
-                log::info!("send set work set");
                 worker.send(WordleWorkerInput::SetWordSetEncoded(
                     to_vec_packed(&word_set.reduce_entropies(10)).unwrap(),
                 ));
-                log::info!("finished send");
                 || ()
             },
             word_set_name,
         )
     }
 
-    let on_run_button_click = {
+    let on_start_button_click = {
+        let stepping = stepping.clone();
         let worker = worker.clone();
         let word_set = word_set.clone();
         let selected_words = selected_words.clone();
@@ -230,6 +243,7 @@ pub fn view() -> Html {
         let word_set = word_set.clone();
 
         Callback::from(move |_| {
+            *stepping.borrow_mut() = false;
             let mut words = match *selected_words.borrow() {
                 SelectedWords::Random(n) => {
                     let mut rng = thread_rng();
@@ -259,13 +273,49 @@ pub fn view() -> Html {
         })
     };
 
+    let on_step_button_click = {
+        let stepping = stepping.clone();
+        let next_step = next_step.clone();
+        let worker = worker.clone();
+
+        Callback::from(move |_| {
+            *stepping.borrow_mut() = true;
+
+            let input = send_queue.borrow_mut().take();
+            if let Some(input) = input {
+                worker.send(WordleWorkerInput::Simulation(input));
+            } else {
+                next_step.set(true);
+            }
+        })
+    };
+
+    let on_continue_button_click = {
+        let stepping = stepping.clone();
+
+        Callback::from(move |_| {
+            *stepping.borrow_mut() = false;
+        })
+    };
+
     let data = simulation_state.turns_data.clone();
     let words_len = word_set.dictionary.words.len();
+    let running = !simulation_state.words_left.is_empty();
 
     html! {
         <section>
             <SelectWords dictionary={word_set.dictionary.clone()} {on_words_set} />
-            <button class="btn btn-primary" onclick={on_run_button_click}>{ "Run" }</button>
+            <button class="btn btn-primary" onclick={on_start_button_click}>{ "Start" }</button>
+            <button
+                class="btn btn-primary"
+                onclick={on_continue_button_click}
+                disabled={!*stepping.borrow() || !running}
+            > { "Continue" }</button>
+            <button
+                class="btn btn-primary"
+                onclick={on_step_button_click}
+                disabled={!running}
+            >{ "Step" }</button>
             <div class="columns">
                 <div class="column">
                     <TurnsPlot {data} {words_len} />

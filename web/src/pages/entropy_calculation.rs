@@ -201,10 +201,10 @@ pub fn view() -> Html {
                 </div>
             </div>
             <div class="columns">
-                <div class="column col-6 col-md-12">
+                <div class="column col-8 col-xl-12">
                     <EntropyPlot {data} />
                 </div>
-                <div class="column col-6 col-md-12">
+                <div class="column col-4 col-xl-12">
                     <label for="max_words_shown_input">{"Max words shown:"}</label>
                     <input id="max_words_shown_input" onchange={on_max_words_shown_change} value={(*max_words_shown).to_string()}/>
                     <table class="table words_entropies_list" onclick={onclick_word}>

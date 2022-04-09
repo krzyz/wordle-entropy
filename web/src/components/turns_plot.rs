@@ -11,7 +11,7 @@ use yew::{functional::function_component, html, use_effect, use_node_ref, Proper
 // c * (x+1)^r log((x+1))
 pub fn log_f_s<S: Scalar + Float>(x: S, r: S, a: S, b: S) -> S {
     let x = x + One::one();
-    b + a * x.powf(r) * x.ln()
+    b + a * x.powf(r) * x.ln() + One::one()
 }
 
 pub fn log_f<S: Scalar + Float>(x: &DVector<S>, r: S) -> DVector<S> {
