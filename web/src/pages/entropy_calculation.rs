@@ -13,22 +13,26 @@ use crate::word_set::get_current_word_set;
 use crate::word_set::{WordSetVec, WordSetVecAction};
 use crate::worker::{WordleWorkerInput, WordleWorkerOutput};
 use crate::worker_atom::WordleWorkerAtom;
-use crate::{EntropiesData, Word};
+use crate::EntropiesData;
 
 enum EntropyStateAction {
-    ChangeSelected(Option<Word>, Rc<Vec<(EntropiesData, f64)>>, Option<bool>),
+    ChangeSelected(
+        Option<usize>,
+        Rc<Vec<(usize, EntropiesData, f64)>>,
+        Option<bool>,
+    ),
     StartRunning,
     StopRunning,
 }
 #[derive(Clone, PartialEq)]
 struct EntropyState {
     running: bool,
-    word: Option<Word>,
+    word: Option<usize>,
     data: Vec<f64>,
 }
 
 impl EntropyState {
-    fn new(word: Word, data: Vec<f64>, running: bool) -> Self {
+    fn new(word: usize, data: Vec<f64>, running: bool) -> Self {
         Self {
             running,
             word: Some(word),
@@ -56,17 +60,14 @@ impl Reducible for EntropyState {
     fn reduce(self: Rc<Self>, action: Self::Action) -> Rc<Self> {
         match action {
             EntropyStateAction::ChangeSelected(word, entropies, running) => {
-                if let Some(ref word) = word {
+                if let Some(word) = word {
                     let word_entropy = entropies
                         .iter()
-                        .find(|&(entropies_data, _)| &entropies_data.word == word)
+                        .find(|&(entropies_word, _, _)| *entropies_word == word)
                         .cloned();
                     let data = word_entropy
-                        .map(|(entropies_data, _)| {
-                            entropies_data
-                                .probabilities
-                                .into_values()
-                                .collect::<Vec<_>>()
+                        .map(|(_, entropies_data, _)| {
+                            entropies_data.probabilities.into_iter().collect::<Vec<_>>()
                         })
                         .unwrap_or(vec![]);
 
@@ -99,10 +100,7 @@ pub fn view() -> Html {
             WordleWorkerOutput::SetWordSet(name) => log::info!("Set worker with: {name}"),
             WordleWorkerOutput::Entropy(name, entropies_output) => {
                 let entropies = Rc::new(entropies_output);
-                let word = entropies
-                    .iter()
-                    .next()
-                    .map(|(entropies_data, _)| Some(entropies_data.word.clone()));
+                let word = entropies.iter().next().map(|&(word, _, _)| Some(word));
                 if let Some(word) = word {
                     selected_state.dispatch(EntropyStateAction::ChangeSelected(
                         word,
@@ -163,7 +161,7 @@ pub fn view() -> Html {
             let element: HtmlElement = e.target_unchecked_into();
             if let Some(word) = element.dataset().get("word") {
                 selected_state.dispatch(EntropyStateAction::ChangeSelected(
-                    Some(word.as_str().try_into().unwrap()),
+                    Some(word.as_str().parse::<usize>().unwrap()),
                     word_set.entropies.clone().unwrap_or(Rc::new(vec![])),
                     None,
                 ));
@@ -221,8 +219,7 @@ pub fn view() -> Html {
                             {
                                 if let Some(ref entropies) = word_set.entropies {
                                     entropies
-                                        .iter().take(*max_words_shown).map(|(entropy_data, left_turns)| {
-                                            let word = &entropy_data.word;
+                                        .iter().take(*max_words_shown).map(|(word, entropy_data, left_turns)| {
                                             let entropy = &entropy_data.entropy;
                                             html! {
                                                 <tr
@@ -232,10 +229,10 @@ pub fn view() -> Html {
                                                         (selected_word_val).clone().map(|selected_word| { *word == selected_word }).map(|is_selected| is_selected.then(|| Some("text-primary")))
                                                     )}
                                                 >
-                                                    <td data-word={format!("{word}")}> { word }</td>
+                                                    <td data-word={format!("{word}")}> { &word_set.dictionary.words[*word] }</td>
                                                     <td data-word={format!("{word}")}> { format!("{entropy:.3}") } </td>
                                                     <td data-word={format!("{word}")}> { format!("{left_turns:.3}") } </td>
-                                                    <td data-word={format!("{word}")}> { "??" } </td>
+                                                    <td data-word={format!("{word}")}> { format!("{:.3}", &word_set.dictionary.probabilities[*word]) } </td>
                                                 </tr>
                                             }
                                         }).collect::<Html>()

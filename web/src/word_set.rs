@@ -10,7 +10,7 @@ use yew::Reducible;
 pub struct WordSet {
     pub name: String,
     pub dictionary: Rc<Dictionary>,
-    pub entropies: Option<Rc<Vec<(EntropiesData, f64)>>>,
+    pub entropies: Option<Rc<Vec<(usize, EntropiesData, f64)>>>,
 }
 
 impl WordSet {
@@ -22,7 +22,7 @@ impl WordSet {
         }
     }
 
-    pub fn with_entropies(&self, entropies: Rc<Vec<(EntropiesData, f64)>>) -> Self {
+    pub fn with_entropies(&self, entropies: Rc<Vec<(usize, EntropiesData, f64)>>) -> Self {
         Self {
             name: self.name.clone(),
             dictionary: self.dictionary.clone(),
@@ -54,7 +54,7 @@ pub enum WordSetVecAction {
     Set(WordSetVec),
     Remove(String),
     LoadWords(String, Dictionary),
-    SetEntropy(String, Rc<Vec<(EntropiesData, f64)>>),
+    SetEntropy(String, Rc<Vec<(usize, EntropiesData, f64)>>),
 }
 
 #[derive(Clone, Debug, PartialEq, Slice, Serialize, Deserialize)]

@@ -63,22 +63,23 @@ pub fn solve<const N: usize>(
                     -0.029045254,
                 ) * (1. - prob);
 
-                (entropies_data, left_diff)
+                (i, entropies_data, left_diff)
             })
             .collect::<Vec<_>>();
 
-        scores.sort_by(|&(_, score1), &(_, score2)| score1.partial_cmp(&score2).unwrap_or(Equal));
+        scores.sort_by(|&(_, _, score1), &(_, _, score2)| {
+            score1.partial_cmp(&score2).unwrap_or(Equal)
+        });
 
         if print {
             println!("Prob norm: {prob_norm}");
             println!("10 best gueses:");
-            for (entropies_data, score) in scores.iter().take(10) {
-                println!("{}: {score}", entropies_data.word);
+            for &(i, _, score) in scores.iter().take(10) {
+                println!("{}: {score}", &dictionary.words[i]);
             }
         }
 
-        let (entropies_data, _) = scores.into_iter().next().unwrap();
-        let guess = &entropies_data.word;
+        let guess = &dictionary.words[scores.into_iter().next().unwrap().0];
 
         let (hints, knowledge_new) = get_hints_and_update(guess, correct, knowledge);
 

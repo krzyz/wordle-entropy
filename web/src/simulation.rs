@@ -22,7 +22,7 @@ pub enum SimulationOutput {
         guess: Word,
         hints: Hints,
         uncertainty: f64,
-        scores: Vec<(EntropiesData, f64)>,
+        scores: Vec<(usize, EntropiesData, f64)>,
         answers: Vec<usize>,
     },
     Stopped,
@@ -32,7 +32,7 @@ pub struct SimulationData {
     word_set: Rc<WordSet>,
     correct: Word,
     knowledge: Knowledge,
-    entropies: Rc<Vec<(EntropiesData, f64)>>,
+    entropies: Rc<Vec<(usize, EntropiesData, f64)>>,
     answers: Vec<usize>,
 }
 
@@ -69,7 +69,7 @@ impl Simulation {
     ) -> Result<SimulationOutput> {
         match input {
             SimulationInput::Start(correct, guess) => self.handle_start(word_set, correct, guess),
-            SimulationInput::Continue(guess) => self.handle_continue(guess),
+            SimulationInput::Continue(guess) => self.handle_continue(word_set, guess),
             SimulationInput::Stop => self.handle_stop(),
         }
     }
@@ -82,24 +82,30 @@ impl Simulation {
     ) -> Result<SimulationOutput> {
         self.state = Some(SimulationData::new(word_set, correct)?);
 
-        self.handle_continue(guess)
+        self.handle_continue(word_set, guess)
     }
 
-    pub fn handle_continue(&mut self, guess: Option<Word>) -> Result<SimulationOutput> {
+    pub fn handle_continue(
+        &mut self,
+        word_set: &WordSet,
+        guess: Option<Word>,
+    ) -> Result<SimulationOutput> {
         let data = self.state.as_mut().ok_or(anyhow!("Missing state"))?;
 
         let guess = match guess {
             Some(guess) => guess,
-            None => data
-                .entropies
-                .iter()
-                .next()
-                .ok_or(anyhow!(
-                    "Neither guess nor entropies available, unable to make the next guess!"
-                ))?
-                .0
-                .word
-                .clone(),
+            None => {
+                let word_ind = data
+                    .entropies
+                    .iter()
+                    .next()
+                    .ok_or(anyhow!(
+                        "Neither guess nor entropies available, unable to make the next guess!"
+                    ))?
+                    .0;
+
+                word_set.dictionary.words[word_ind].clone()
+            }
         };
 
         let (hints, knowledge) =

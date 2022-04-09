@@ -1,16 +1,30 @@
+use std::str::FromStr;
+
 #[cfg(feature = "terminal")]
 use colored::Colorize;
 use core::fmt;
+use itertools::{repeat_n, Itertools};
 use serde::{
     de::{self, Visitor},
     Deserializer, Serializer,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{DeserializeFromStr, SerializeDisplay};
-use std::str::FromStr;
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 
 #[derive(
-    Copy, Clone, Debug, SerializeDisplay, DeserializeFromStr, PartialEq, Eq, PartialOrd, Ord, Hash,
+    Copy,
+    Clone,
+    Debug,
+    SerializeDisplay,
+    DeserializeFromStr,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    EnumIter,
 )]
 pub enum Hint {
     Wrong,
@@ -88,6 +102,21 @@ impl<const N: usize> HintsN<N> {
     pub fn wrong() -> Self {
         Self([Hint::Wrong; N])
     }
+
+    pub fn all() -> Vec<Self> {
+        repeat_n(Hint::iter(), N)
+            .multi_cartesian_product()
+            .map(|hint_vec| Self(hint_vec.try_into().unwrap()))
+            .collect()
+    }
+
+    pub fn to_ind(&self) -> usize {
+        self.0
+            .into_iter()
+            .enumerate()
+            .map(|(i, x)| 3usize.pow((N - i - 1) as u32) * x as usize)
+            .sum()
+    }
 }
 
 impl<const N: usize> FromStr for HintsN<N> {
@@ -146,6 +175,35 @@ impl<const N: usize> TryFrom<Vec<Hint>> for HintsN<N> {
             Err("Wrong size!")
         } else {
             Ok(Self(value.try_into().unwrap()))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn all_hints_test() {
+        let all_hints = HintsN::<3>::all();
+        let expected: Vec<HintsN<3>> = vec![
+            "www", "wwo", "wwc", "wow", "woo", "woc", "wcw", "wco", "wcc", "oww", "owo", "owc",
+            "oow", "ooo", "ooc", "ocw", "oco", "occ", "cww", "cwo", "cwc", "cow", "coo", "coc",
+            "ccw", "cco", "ccc",
+        ]
+        .into_iter()
+        .map(|h| h.parse().unwrap())
+        .collect();
+
+        assert_eq!(expected, all_hints);
+    }
+
+    #[test]
+    fn to_ind_test() {
+        let all_hints = HintsN::<4>::all();
+
+        for (i, hints) in all_hints.iter().enumerate() {
+            assert_eq!(i, hints.to_ind());
         }
     }
 }

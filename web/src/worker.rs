@@ -24,7 +24,7 @@ pub enum WordleWorkerOutput {
         entropies: bool,
     },
     SetWordSet(String),
-    Entropy(String, Vec<(EntropiesData, f64)>),
+    Entropy(String, Vec<(usize, EntropiesData, f64)>),
     Simulation(SimulationOutput),
     Err(String),
 }

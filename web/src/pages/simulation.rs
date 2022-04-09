@@ -23,7 +23,7 @@ enum SimulationStateAction {
         guess: Word,
         hints: Hints,
         uncertainty: f64,
-        scores: Vec<(EntropiesData, f64)>,
+        scores: Vec<(usize, EntropiesData, f64)>,
         answers: Vec<usize>,
     },
 }
@@ -141,6 +141,7 @@ pub fn view() -> Html {
         let send_queue = send_queue.clone();
         let simulation_state = simulation_state.clone();
         let words_left = words_left.clone();
+        let word_set = word_set.clone();
         move |output: WordleWorkerOutput| match output {
             WordleWorkerOutput::SetWordSet(name) => log::info!("Set worker with: {name}"),
             WordleWorkerOutput::Simulation(output) => match output {
@@ -154,13 +155,15 @@ pub fn view() -> Html {
                     let words = scores
                         .iter()
                         .take(10)
-                        .map(|(EntropiesData { word, entropy, .. }, _)| {
+                        .map(|(word_ind, EntropiesData { entropy, .. }, _)| {
+                            let word = &word_set.dictionary.words[*word_ind];
                             format!("{word}: {entropy}")
                         })
                         .collect::<Vec<_>>()
                         .join(", ");
 
-                    let next_guess = scores.iter().next().unwrap().0.word.clone();
+                    let next_guess =
+                        word_set.dictionary.words[scores.iter().next().unwrap().0].clone();
 
                     let next_word = if answers.len() > 1 {
                         match send_queue.try_borrow_mut() {

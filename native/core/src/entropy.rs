@@ -1,5 +1,4 @@
 use arrayvec::ArrayVec;
-use fxhash::FxHashMap;
 use ndarray::Array1;
 #[cfg(feature = "parallel")]
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -36,7 +35,6 @@ pub fn calculate_entropies<const N: usize>(
         .map(|&i| dictionary.probabilities[i])
         .sum();
     let guess_words_bytes = &dictionary.words_bytes;
-    let trans = &dictionary.translator;
 
     #[cfg(feature = "parallel")]
     let guess_words_iter = guess_words_bytes.par_iter();
@@ -46,21 +44,20 @@ pub fn calculate_entropies<const N: usize>(
 
     let entropies = guess_words_iter
         .map(|guess_b| {
-            let mut guess_hints = FxHashMap::<_, f64>::default();
+            let mut guess_hints = vec![0.; dictionary.hints.len()];
             for (correct, probability) in possible_answers
                 .iter()
                 .map(|&i| (&dictionary.words_bytes[i], &dictionary.probabilities[i]))
             {
                 let mut left = ArrayVec::<_, N>::new();
                 let hints = algo::get_hints_with_work_array(&guess_b, correct, &mut left);
-                *guess_hints.entry(hints).or_default() += *probability / prob_norm;
+                guess_hints[hints.to_ind()] += *probability / prob_norm;
             }
 
-            let probs = Array1::<f64>::from_vec(guess_hints.values().copied().collect::<Vec<_>>());
+            let probs = Array1::<f64>::from_vec(guess_hints.clone());
             let entropy = entropy(probs);
-            let guess = trans.to_chars(guess_b);
 
-            EntropiesData::new(guess.clone(), entropy, guess_hints)
+            EntropiesData::new(entropy, guess_hints)
         })
         .collect::<Vec<_>>();
 
@@ -72,7 +69,7 @@ pub fn entropies_scored<const N: usize>(
     answers: &[usize],
     entropies: Vec<EntropiesData<N>>,
     uncertainty: Option<f64>,
-) -> Vec<(EntropiesData<N>, f64)> {
+) -> Vec<(usize, EntropiesData<N>, f64)> {
     let uncertainty = match uncertainty {
         Some(uncertainty) => uncertainty,
         None => (dictionary.words.len() as f64).log2(),
@@ -97,11 +94,11 @@ pub fn entropies_scored<const N: usize>(
                 -0.029045254,
             ) * (1. - prob);
 
-            (entropies_data, left_diff)
+            (i, entropies_data, left_diff)
         })
         .collect::<Vec<_>>();
 
-    scores.sort_by(|&(_, score1), &(_, score2)| score1.partial_cmp(&score2).unwrap_or(Equal));
+    scores.sort_by(|&(_, _, score1), &(_, _, score2)| score1.partial_cmp(&score2).unwrap_or(Equal));
 
     scores
 }
