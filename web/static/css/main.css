@@ -6,16 +6,17 @@ li {
   padding-left: 2em; text-indent: -2em;
 }
 
-ul.words_entropies_list {
-  height: 400px;
-  overflow:hidden;
-  overflow-y:scroll;
+.words_entropies_list {
+  width: 100%;
+  max-height: 400px;
+  overflow: hidden;
+  overflow-y: scroll;
 }
 
 ul.words_left_list {
   height: 400px;
-  overflow:hidden;
-  overflow-y:scroll;
+  overflow: hidden;
+  overflow-y: scroll;
 }
 
 .fill-space {

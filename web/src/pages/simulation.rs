@@ -292,9 +292,11 @@ pub fn view() -> Html {
 
     let on_continue_button_click = {
         let stepping = stepping.clone();
+        let next_step = next_step.clone();
 
         Callback::from(move |_| {
             *stepping.borrow_mut() = false;
+            next_step.set(false);
         })
     };
 
