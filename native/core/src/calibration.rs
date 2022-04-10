@@ -15,10 +15,10 @@ pub struct Calibration {
 impl Default for Calibration {
     fn default() -> Self {
         Self {
-            c: 1.,
-            a0: -2.,
-            a1: 3.,
-            a2: 2.,
+            c: 0.2372,
+            a0: -2.1664,
+            a1: 10.209,
+            a2: 2.4787,
         }
     }
 }
