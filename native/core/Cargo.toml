@@ -19,9 +19,10 @@ serde_with = "1.12.0"
 thiserror = "1.0.30"
 strum = "0.24.0"
 strum_macros = "0.24.0"
-nalgebra = "0.30.1"
+nalgebra = "0.29"
 num-traits = "0.2.14"
 num = "0.4.0"
+varpro = "0.3.0"
 
 [features]
 default = ["parallel"]

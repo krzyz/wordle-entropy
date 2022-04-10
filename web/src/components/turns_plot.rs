@@ -1,85 +1,8 @@
-use nalgebra::{DVector, Scalar};
-use num::One;
-use num_traits::Float;
 use plotters::prelude::*;
 use plotters_canvas::CanvasBackend;
-use varpro::prelude::*;
-use varpro::solvers::levmar::{LevMarProblemBuilder, LevMarSolver};
 use web_sys::HtmlCanvasElement;
+use wordle_entropy_core::calibration::{bounded_log_c, fit, Calibration};
 use yew::{functional::function_component, html, use_effect, use_node_ref, Properties};
-
-pub fn bounded_log<S: Scalar + Float>(x: S, a1: S, a2: S, a3: S) -> S {
-    let val = a1 + a2 * (x + a3).ln();
-    if val > One::one() {
-        val
-    } else {
-        One::one()
-    }
-}
-
-pub fn bounded_log_v<S: Scalar + Float>(x: &DVector<S>, a1: S, a2: S, a3: S) -> DVector<S> {
-    x.map(|x| bounded_log(x, a1, a2, a3))
-}
-
-pub fn bounded_log_da1<S: Scalar + Float>(x: &DVector<S>, a1: S, a2: S, a3: S) -> DVector<S> {
-    let one: S = One::one();
-    x.map(|x| {
-        if bounded_log(x, a1, a2, a3) > one {
-            one - one
-        } else {
-            one
-        }
-    })
-}
-
-pub fn bounded_log_da2<S: Scalar + Float>(x: &DVector<S>, a1: S, a2: S, a3: S) -> DVector<S> {
-    let one: S = One::one();
-    x.map(|x| {
-        if bounded_log(x, a1, a2, a3) > one {
-            (x + a3).ln()
-        } else {
-            one
-        }
-    })
-}
-
-pub fn bounded_log_da3<S: Scalar + Float>(x: &DVector<S>, a1: S, a2: S, a3: S) -> DVector<S> {
-    let one: S = One::one();
-    x.map(|x| {
-        if bounded_log(x, a1, a2, a3) > one {
-            a2 / (x + a3)
-        } else {
-            one
-        }
-    })
-}
-
-fn fit(data: Vec<(f64, f64)>) -> (f64, f64, f64, f64) {
-    let (x, y): (Vec<_>, Vec<_>) = data.into_iter().unzip();
-
-    let model = SeparableModelBuilder::<f64>::new(&["a1", "a2", "a3"])
-        .function(&["a1", "a2", "a3"], bounded_log_v)
-        .partial_deriv("a1", bounded_log_da1)
-        .partial_deriv("a2", bounded_log_da2)
-        .partial_deriv("a3", bounded_log_da3)
-        .build()
-        .unwrap();
-
-    let problem = LevMarProblemBuilder::new()
-        .model(&model)
-        .x(x)
-        .y(y)
-        .initial_guess(&[-2., 3., 1.])
-        .build()
-        .unwrap();
-
-    let (solved_problem, report) = LevMarSolver::new().minimize(problem);
-    assert!(report.termination.was_successful());
-    let alpha = solved_problem.params();
-    let c = solved_problem.linear_coefficients().unwrap();
-
-    (c[0], alpha[0], alpha[1], alpha[2])
-}
 
 fn draw_plot(
     canvas: HtmlCanvasElement,
@@ -110,21 +33,20 @@ fn draw_plot(
 
     let axis_val_multiplier = 5.;
     if data.len() >= 4 {
-        let (c, a1, a2, a3) = fit(data.iter().cloned().collect());
+        let calibration = fit(data.iter().cloned().collect());
         chart.draw_series(LineSeries::new(
             (0..=((axis_val_multiplier * x_max.floor()) as i32))
                 .map(|x| (x as f64) / axis_val_multiplier)
-                .map(|x| (x, c * bounded_log(x, a1, a2, a3))),
+                .map(|x| (x, bounded_log_c(x, calibration))),
             &RED,
         ))?;
     }
 
     {
-        let (c, a1, a2, a3) = (1., -2., 3., 1.);
         chart.draw_series(LineSeries::new(
             (0..=((axis_val_multiplier * x_max.floor()) as i32))
                 .map(|x| (x as f64) / axis_val_multiplier)
-                .map(|x| (x, c * bounded_log(x, a1, a2, a3))),
+                .map(|x| (x, bounded_log_c(x, Calibration::default()))),
             &BLUE,
         ))?;
     }

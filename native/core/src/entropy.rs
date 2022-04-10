@@ -6,6 +6,7 @@ use std::cmp::Ordering::Equal;
 
 use crate::{
     algo,
+    calibration::{bounded_log_c, Calibration},
     solvers::expected_turns,
     structs::{Dictionary, EntropiesData},
 };
@@ -88,7 +89,8 @@ pub fn entropies_scored<const N: usize>(
 
             // the less the better
             let left_diff =
-                expected_turns(uncertainty - entropies_data.entropy, 1., -2., 3., 1.) * (1. - prob);
+                bounded_log_c(uncertainty - entropies_data.entropy, Calibration::default())
+                    * (1. - prob);
 
             (i, entropies_data, left_diff)
         })

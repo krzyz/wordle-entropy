@@ -8,6 +8,7 @@ use rand::prelude::IteratorRandom;
 
 use crate::{
     algo::{get_answers, get_hints_and_update},
+    calibration::{bounded_log_c, Calibration},
     entropy::calculate_entropies,
     structs::{hints::HintsN, knowledge::KnowledgeN, word::WordN, Dictionary, EntropiesData},
     util::print_vec,
@@ -22,15 +23,8 @@ pub fn bounded_log<S: Scalar + Float>(x: S, a1: S, a2: S, a3: S) -> S {
     }
 }
 
-/*
-pub fn expected_turns(x: f64, r: f64, a: f64, b: f64) -> f64 {
-    let x = f64::max(x, 0.) + 1.;
-    b + a * x.powf(r) * x.ln() + 1.
-}
-*/
-
-pub fn expected_turns(x: f64, c: f64, a1: f64, a2: f64, a3: f64) -> f64 {
-    (c * bounded_log(x, a1, a2, a3)).clamp(f64::NEG_INFINITY, 1.)
+pub fn expected_turns(x: f64, calibration: Calibration) -> f64 {
+    bounded_log_c(x, calibration).clamp(f64::NEG_INFINITY, 1.)
 }
 
 pub fn solve<const N: usize>(
@@ -76,7 +70,7 @@ pub fn solve<const N: usize>(
 
                 // the less the better
                 let left_diff =
-                    expected_turns(uncertainty - entropies_data.entropy, 1., -2., 3., 1.)
+                    expected_turns(uncertainty - entropies_data.entropy, Calibration::default())
                         * (1. - prob);
 
                 (i, entropies_data, left_diff)

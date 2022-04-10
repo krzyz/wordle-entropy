@@ -1,4 +1,5 @@
 pub mod algo;
+pub mod calibration;
 pub mod data;
 pub mod entropy;
 pub mod solvers;
