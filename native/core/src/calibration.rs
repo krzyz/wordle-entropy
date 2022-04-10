@@ -73,7 +73,7 @@ pub fn bounded_log_da2<S: Scalar + Float>(x: &DVector<S>, a0: S, a1: S, a2: S) -
     })
 }
 
-pub fn fit(data: Vec<(f64, f64)>) -> Calibration {
+pub fn fit(data: Vec<(f64, f64)>, weights: Vec<f64>) -> Calibration {
     let (x, y): (Vec<_>, Vec<_>) = data.into_iter().unzip();
 
     let model = SeparableModelBuilder::<f64>::new(&["a0", "a1", "a2"])
@@ -88,6 +88,7 @@ pub fn fit(data: Vec<(f64, f64)>) -> Calibration {
         .model(&model)
         .x(x)
         .y(y)
+        .weights(weights)
         .initial_guess(&[-2., 3., 1.])
         .build()
         .unwrap();

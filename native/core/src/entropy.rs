@@ -7,7 +7,6 @@ use std::cmp::Ordering::Equal;
 use crate::{
     algo,
     calibration::{bounded_log_c, Calibration},
-    solvers::expected_turns,
     structs::{Dictionary, EntropiesData},
 };
 

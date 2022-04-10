@@ -11,15 +11,15 @@ use crate::{word_set::WordSet, EntropiesData, Hints, Knowledge, Word};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum SimulationInput {
-    Start(Word, Option<Word>),
-    Continue(Option<Word>),
+    Start(Word, Option<usize>),
+    Continue(Option<usize>),
     Stop,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SimulationOutput {
     StepComplete {
-        guess: Word,
+        guess: usize,
         hints: Hints,
         uncertainty: f64,
         scores: Vec<(usize, EntropiesData, f64)>,
@@ -69,7 +69,7 @@ impl Simulation {
     ) -> Result<SimulationOutput> {
         match input {
             SimulationInput::Start(correct, guess) => self.handle_start(word_set, correct, guess),
-            SimulationInput::Continue(guess) => self.handle_continue(word_set, guess),
+            SimulationInput::Continue(guess) => self.handle_continue(guess),
             SimulationInput::Stop => self.handle_stop(),
         }
     }
@@ -78,38 +78,32 @@ impl Simulation {
         &mut self,
         word_set: &Rc<WordSet>,
         correct: Word,
-        guess: Option<Word>,
+        guess: Option<usize>,
     ) -> Result<SimulationOutput> {
         self.state = Some(SimulationData::new(word_set, correct)?);
 
-        self.handle_continue(word_set, guess)
+        self.handle_continue(guess)
     }
 
-    pub fn handle_continue(
-        &mut self,
-        word_set: &WordSet,
-        guess: Option<Word>,
-    ) -> Result<SimulationOutput> {
+    pub fn handle_continue(&mut self, guess: Option<usize>) -> Result<SimulationOutput> {
         let data = self.state.as_mut().ok_or(anyhow!("Missing state"))?;
 
         let guess = match guess {
             Some(guess) => guess,
             None => {
-                let word_ind = data
-                    .entropies
+                data.entropies
                     .iter()
                     .next()
                     .ok_or(anyhow!(
                         "Neither guess nor entropies available, unable to make the next guess!"
                     ))?
-                    .0;
-
-                word_set.dictionary.words[word_ind].clone()
+                    .0
             }
         };
 
+        let guess_word = data.word_set.dictionary.words[guess].clone();
         let (hints, knowledge) =
-            get_hints_and_update(&guess, &data.correct, data.knowledge.clone());
+            get_hints_and_update(&guess_word, &data.correct, data.knowledge.clone());
 
         data.answers = get_answers(data.word_set.dictionary.words.clone(), &knowledge);
         data.knowledge = knowledge;

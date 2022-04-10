@@ -5,7 +5,6 @@ use anyhow::{anyhow, Result};
 use gloo_worker::{HandlerId, Public, Worker, WorkerLink};
 use serde::{Deserialize, Serialize};
 use serde_cbor::from_slice;
-use std::any::Any;
 use std::rc::Rc;
 use wordle_entropy_core::entropy::{calculate_entropies, entropies_scored};
 

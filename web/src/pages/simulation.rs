@@ -20,7 +20,7 @@ enum SimulationStateAction {
     Initialize(Word, Vec<Word>, Rc<WordSet>),
     NextStep {
         next_word: Option<Word>,
-        guess: Word,
+        guess: usize,
         hints: Hints,
         uncertainty: f64,
         scores: Vec<(usize, EntropiesData, f64)>,
@@ -31,11 +31,11 @@ enum SimulationStateAction {
 #[derive(Clone, Default, PartialEq)]
 struct SimulationState {
     current_turns: Vec<(f64, f64)>,
-    turns_data: Vec<(f64, f64)>,
+    turns_data: Vec<(f64, f64, f64)>,
     current_word: Option<Word>,
     last_hints: Option<Hints>,
-    last_guess: Option<Word>,
-    history: Vec<Vec<(Word, Hints, f64)>>,
+    last_guess: Option<usize>,
+    history: Vec<Vec<(usize, Hints, f64)>>,
     words_left: Vec<Word>,
     word_set: Option<Rc<WordSet>>,
 }
@@ -68,7 +68,7 @@ impl Reducible for SimulationState {
                 let mut turns_data = self.turns_data.clone();
                 let mut history = self.history.clone();
 
-                let mut last_optn: Option<&mut Vec<(Word, Hints, f64)>>;
+                let mut last_optn: Option<&mut Vec<(usize, Hints, f64)>>;
                 let history_last = if let Some(history_last) = history.last_mut() {
                     history_last
                 } else {
@@ -76,25 +76,30 @@ impl Reducible for SimulationState {
                     last_optn = history.last_mut();
                     &mut **last_optn.as_mut().unwrap()
                 };
-                history_last.push((guess.clone(), hints.clone(), uncertainty));
+                history_last.push((guess, hints.clone(), uncertainty));
 
                 let word = if answers.len() == 1 {
                     let mut turns_num = current_turns.len();
 
-                    let correct_answer =
-                        &self.word_set.as_ref().unwrap().dictionary.words[answers[0]];
-                    if correct_answer != &guess {
-                        history_last.push((correct_answer.clone(), Hints::correct(), 0.));
+                    let answer = answers[0];
+                    if answer != guess {
+                        history_last.push((answer, Hints::correct(), 0.));
                         turns_num += 1;
                     }
                     if words_left.len() > 0 {
                         words_left.remove(0);
                     }
-                    turns_data.extend(
-                        current_turns
-                            .iter()
-                            .map(|&(uncertainty, turn)| (uncertainty, turns_num as f64 - turn)),
-                    );
+                    turns_data.extend(current_turns.iter().map(|&(uncertainty, turn)| {
+                        (
+                            uncertainty,
+                            turns_num as f64 - turn,
+                            self.word_set
+                                .as_ref()
+                                .expect("Word set not available")
+                                .dictionary
+                                .probabilities[guess],
+                        )
+                    }));
                     current_turns = vec![];
                     history.push(vec![]);
                     next_word
@@ -162,8 +167,7 @@ pub fn view() -> Html {
                         .collect::<Vec<_>>()
                         .join(", ");
 
-                    let next_guess =
-                        word_set.dictionary.words[scores.iter().next().unwrap().0].clone();
+                    let next_guess = scores.iter().next().unwrap().0;
 
                     let next_word = if answers.len() > 1 {
                         match send_queue.try_borrow_mut() {
@@ -330,9 +334,6 @@ pub fn view() -> Html {
                         if let Some(ref word) = simulation_state.current_word {
                             <p> { word } </p>
                         }
-                        if let (Some(word), Some(hints)) = (simulation_state.last_guess.clone(), simulation_state.last_hints.clone()) {
-                            <p> <HintedWord {word} {hints} /></p>
-                        }
                         <p> { "Left:" } </p>
                         <ul class="words_left_list">
                             {
@@ -353,7 +354,7 @@ pub fn view() -> Html {
                             <p>
                                 {
                                     row.iter().map(|(word, hints, _uncertainty)| {
-                                        let word = word.clone();
+                                        let word = word_set.dictionary.words[*word].clone();
                                         let hints = hints.clone();
                                         html! {
                                             <>

@@ -6,12 +6,24 @@ use yew::{functional::function_component, html, use_effect, use_node_ref, Proper
 
 fn draw_plot(
     canvas: HtmlCanvasElement,
-    data: &[(f64, f64)],
+    data_with_weights: &[(f64, f64, f64)],
     words_len: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let root = CanvasBackend::with_canvas_object(canvas)
         .unwrap()
         .into_drawing_area();
+
+    let data = data_with_weights
+        .into_iter()
+        .copied()
+        .map(|(c1, c2, _)| (c1, c2))
+        .collect::<Vec<_>>();
+
+    let weights = data_with_weights
+        .into_iter()
+        .copied()
+        .map(|(_, _, c3)| c3)
+        .collect::<Vec<_>>();
 
     let y_max = 1.
         + data
@@ -33,13 +45,16 @@ fn draw_plot(
 
     let axis_val_multiplier = 5.;
     if data.len() >= 4 {
-        let calibration = fit(data.iter().cloned().collect());
-        chart.draw_series(LineSeries::new(
-            (0..=((axis_val_multiplier * x_max.floor()) as i32))
-                .map(|x| (x as f64) / axis_val_multiplier)
-                .map(|x| (x, bounded_log_c(x, calibration))),
-            &RED,
-        ))?;
+        let calibration = fit(data.iter().copied().collect(), weights);
+        chart
+            .draw_series(LineSeries::new(
+                (0..=((axis_val_multiplier * x_max.floor()) as i32))
+                    .map(|x| (x as f64) / axis_val_multiplier)
+                    .map(|x| (x, bounded_log_c(x, calibration))),
+                &RED,
+            ))?
+            .label(format!("{calibration:#?}"))
+            .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &RED));
     }
 
     {
@@ -52,13 +67,23 @@ fn draw_plot(
     }
 
     chart.draw_series(PointSeries::of_element(
-        data.iter().copied(),
+        data_with_weights.iter().copied(),
         2,
         &BLACK,
-        &|c, s: i32, st| {
-            return Circle::new(c, s, st.filled());
+        &|(c1, c2, prob), s: i32, st| {
+            return Circle::new((c1, c2), s, {
+                let mut st = st.filled();
+                st.color = BLACK.mix(prob);
+                st
+            });
         },
     ))?;
+
+    chart
+        .configure_series_labels()
+        .background_style(&WHITE.mix(0.8))
+        .border_style(&BLACK)
+        .draw()?;
 
     root.present().expect("Unable to draw");
 
@@ -67,7 +92,7 @@ fn draw_plot(
 
 #[derive(Properties, PartialEq)]
 pub struct Props {
-    pub data: Vec<(f64, f64)>,
+    pub data: Vec<(f64, f64, f64)>,
     pub words_len: usize,
 }
 
