@@ -1,6 +1,10 @@
-use ndarray::Array;
-use rand::prelude::IteratorRandom;
 use std::{cmp::Ordering::Equal, time::Instant};
+
+use nalgebra::Scalar;
+use ndarray::Array;
+use num::One;
+use num_traits::Float;
+use rand::prelude::IteratorRandom;
 
 use crate::{
     algo::{get_answers, get_hints_and_update},
@@ -9,9 +13,24 @@ use crate::{
     util::print_vec,
 };
 
+pub fn bounded_log<S: Scalar + Float>(x: S, a1: S, a2: S, a3: S) -> S {
+    let val = a1 + a2 * (x + a3).ln();
+    if val > One::one() {
+        val
+    } else {
+        One::one()
+    }
+}
+
+/*
 pub fn expected_turns(x: f64, r: f64, a: f64, b: f64) -> f64 {
     let x = f64::max(x, 0.) + 1.;
     b + a * x.powf(r) * x.ln() + 1.
+}
+*/
+
+pub fn expected_turns(x: f64, c: f64, a1: f64, a2: f64, a3: f64) -> f64 {
+    (c * bounded_log(x, a1, a2, a3)).clamp(f64::NEG_INFINITY, 1.)
 }
 
 pub fn solve<const N: usize>(
@@ -56,12 +75,9 @@ pub fn solve<const N: usize>(
                 };
 
                 // the less the better
-                let left_diff = expected_turns(
-                    uncertainty - entropies_data.entropy,
-                    0.,
-                    1.6369421,
-                    -0.029045254,
-                ) * (1. - prob);
+                let left_diff =
+                    expected_turns(uncertainty - entropies_data.entropy, 1., -2., 3., 1.)
+                        * (1. - prob);
 
                 (i, entropies_data, left_diff)
             })

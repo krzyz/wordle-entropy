@@ -507,7 +507,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c4da3d7025ccc9adc55e89535a6b5b8e5c0a2a64fcd6063cda062bc2a193aa73"
 dependencies = [
  "cfg-if",
- "nalgebra",
+ "nalgebra 0.29.0",
  "num-traits",
  "rustc_version 0.4.0",
 ]
@@ -572,7 +572,23 @@ dependencies = [
  "num-complex",
  "num-rational 0.4.0",
  "num-traits",
- "simba",
+ "simba 0.6.0",
+ "typenum",
+]
+
+[[package]]
+name = "nalgebra"
+version = "0.30.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4fb2d0de08694bed883320212c18ee3008576bfe8c306f4c3c4a58b4876998be"
+dependencies = [
+ "approx",
+ "matrixmultiply",
+ "nalgebra-macros",
+ "num-complex",
+ "num-rational 0.4.0",
+ "num-traits",
+ "simba 0.7.1",
  "typenum",
 ]
 
@@ -1082,6 +1098,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "simba"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "13a2609e876d4f77f6ab7ff5254fc39b4f1927ba8e6db3d18be7c32534d3725e"
+dependencies = [
+ "approx",
+ "num-complex",
+ "num-traits",
+ "paste",
+ "wide",
+]
+
+[[package]]
 name = "snafu"
 version = "0.6.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1200,7 +1229,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "178181bcbcdffb0cab1a0b9abc1e3562eac639397daef98353781cb92a50ada4"
 dependencies = [
  "levenberg-marquardt",
- "nalgebra",
+ "nalgebra 0.29.0",
  "num-traits",
  "snafu",
 ]
@@ -1346,7 +1375,7 @@ dependencies = [
 name = "wordle-entropy-bin"
 version = "0.1.0"
 dependencies = [
- "nalgebra",
+ "nalgebra 0.29.0",
  "num",
  "num-traits",
  "plotters",
@@ -1363,7 +1392,10 @@ dependencies = [
  "fxhash",
  "getrandom",
  "itertools",
+ "nalgebra 0.30.1",
  "ndarray",
+ "num",
+ "num-traits",
  "rand",
  "rayon",
  "rstest",

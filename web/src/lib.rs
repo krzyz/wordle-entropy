@@ -11,6 +11,7 @@ mod worker_atom;
 
 use gloo_worker::PublicWorker;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::{spawn_local, JsFuture};
 pub use wasm_bindgen_rayon::init_thread_pool;
 
 const WORD_SIZE: usize = 5;
@@ -29,6 +30,12 @@ pub fn start() {
         wasm_logger::init(wasm_logger::Config::default());
         yew::start_app::<main_app::MainApp>();
     } else {
-        <worker::WordleWorker as PublicWorker>::register();
+        spawn_local(async move {
+            match JsFuture::from(init_thread_pool(12)).await {
+                Ok(_) => log::info!("init ok"),
+                Err(e) => log::info!("error: {:#?}", e),
+            }
+            <worker::WordleWorker as PublicWorker>::register();
+        });
     }
 }

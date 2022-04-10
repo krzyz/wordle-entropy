@@ -70,8 +70,9 @@ pub fn word_set_select() -> Html {
             {
                 word_sets.0.iter().map(|word_set| {
                     let name = word_set.name.clone();
+                    let is_selected = selected.0.as_ref() == Some(&word_set.name);
                     html! {
-                        <option value={name.clone()} selected={selected.0.as_ref() == Some(&word_set.name) }> {name} </option>
+                        <option value={name.clone()} selected={is_selected}> {name} </option>
                     }
                 }).collect::<Html>()
             }

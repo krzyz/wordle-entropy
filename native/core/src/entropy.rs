@@ -87,12 +87,8 @@ pub fn entropies_scored<const N: usize>(
             };
 
             // the less the better
-            let left_diff = expected_turns(
-                uncertainty - entropies_data.entropy,
-                0.,
-                1.6369421,
-                -0.029045254,
-            ) * (1. - prob);
+            let left_diff =
+                expected_turns(uncertainty - entropies_data.entropy, 1., -2., 3., 1.) * (1. - prob);
 
             (i, entropies_data, left_diff)
         })

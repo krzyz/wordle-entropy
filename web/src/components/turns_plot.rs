@@ -8,28 +8,60 @@ use varpro::solvers::levmar::{LevMarProblemBuilder, LevMarSolver};
 use web_sys::HtmlCanvasElement;
 use yew::{functional::function_component, html, use_effect, use_node_ref, Properties};
 
-// c * (x+1)^r log((x+1))
-pub fn log_f_s<S: Scalar + Float>(x: S, r: S, a: S, b: S) -> S {
-    let x = x + One::one();
-    b + a * x.powf(r) * x.ln()
+pub fn bounded_log<S: Scalar + Float>(x: S, a1: S, a2: S, a3: S) -> S {
+    let val = a1 + a2 * (x + a3).ln();
+    if val > One::one() {
+        val
+    } else {
+        One::one()
+    }
 }
 
-pub fn log_f<S: Scalar + Float>(x: &DVector<S>, r: S) -> DVector<S> {
-    x.map(|x| x + One::one()).map(|x| x.powf(r) * x.ln())
+pub fn bounded_log_v<S: Scalar + Float>(x: &DVector<S>, a1: S, a2: S, a3: S) -> DVector<S> {
+    x.map(|x| bounded_log(x, a1, a2, a3))
 }
 
-pub fn log_f_dr<S: Scalar + Float>(rvec: &DVector<S>, r: S) -> DVector<S> {
-    rvec.map(|x| x + One::one())
-        .map(|x| r * x.powf(r - One::one()) * x.ln())
+pub fn bounded_log_da1<S: Scalar + Float>(x: &DVector<S>, a1: S, a2: S, a3: S) -> DVector<S> {
+    let one: S = One::one();
+    x.map(|x| {
+        if bounded_log(x, a1, a2, a3) > one {
+            one - one
+        } else {
+            one
+        }
+    })
 }
 
-fn fit(data: Vec<(f64, f64)>) -> (f64, f64, f64) {
+pub fn bounded_log_da2<S: Scalar + Float>(x: &DVector<S>, a1: S, a2: S, a3: S) -> DVector<S> {
+    let one: S = One::one();
+    x.map(|x| {
+        if bounded_log(x, a1, a2, a3) > one {
+            (x + a3).ln()
+        } else {
+            one
+        }
+    })
+}
+
+pub fn bounded_log_da3<S: Scalar + Float>(x: &DVector<S>, a1: S, a2: S, a3: S) -> DVector<S> {
+    let one: S = One::one();
+    x.map(|x| {
+        if bounded_log(x, a1, a2, a3) > one {
+            a2 / (x + a3)
+        } else {
+            one
+        }
+    })
+}
+
+fn fit(data: Vec<(f64, f64)>) -> (f64, f64, f64, f64) {
     let (x, y): (Vec<_>, Vec<_>) = data.into_iter().unzip();
 
-    let model = SeparableModelBuilder::<f64>::new(&["r"])
-        .function(&["r"], log_f)
-        .partial_deriv("r", log_f_dr)
-        .invariant_function(|x| x.clone())
+    let model = SeparableModelBuilder::<f64>::new(&["a1", "a2", "a3"])
+        .function(&["a1", "a2", "a3"], bounded_log_v)
+        .partial_deriv("a1", bounded_log_da1)
+        .partial_deriv("a2", bounded_log_da2)
+        .partial_deriv("a3", bounded_log_da3)
         .build()
         .unwrap();
 
@@ -37,7 +69,7 @@ fn fit(data: Vec<(f64, f64)>) -> (f64, f64, f64) {
         .model(&model)
         .x(x)
         .y(y)
-        .initial_guess(&[0.])
+        .initial_guess(&[-2., 3., 1.])
         .build()
         .unwrap();
 
@@ -46,7 +78,7 @@ fn fit(data: Vec<(f64, f64)>) -> (f64, f64, f64) {
     let alpha = solved_problem.params();
     let c = solved_problem.linear_coefficients().unwrap();
 
-    (c[0], c[1], alpha[0])
+    (c[0], alpha[0], alpha[1], alpha[2])
 }
 
 fn draw_plot(
@@ -76,24 +108,23 @@ fn draw_plot(
 
     chart.configure_mesh().draw()?;
 
-    if data.len() >= 3 {
-        let (a, b, r) = fit(data.iter().cloned().collect());
-        let c = 5.;
+    let axis_val_multiplier = 5.;
+    if data.len() >= 4 {
+        let (c, a1, a2, a3) = fit(data.iter().cloned().collect());
         chart.draw_series(LineSeries::new(
-            (0..=((c * x_max.floor()) as i32))
-                .map(|x| (x as f64) / c)
-                .map(|x| (x, log_f_s(x, r, a, b))),
+            (0..=((axis_val_multiplier * x_max.floor()) as i32))
+                .map(|x| (x as f64) / axis_val_multiplier)
+                .map(|x| (x, c * bounded_log(x, a1, a2, a3))),
             &RED,
         ))?;
     }
 
     {
-        let (a, b, r) = (1.6369421, -0.029045254, 0.);
-        let c = 5.;
+        let (c, a1, a2, a3) = (1., -2., 3., 1.);
         chart.draw_series(LineSeries::new(
-            (0..=((c * x_max.floor()) as i32))
-                .map(|x| (x as f64) / c)
-                .map(|x| (x, log_f_s(x, r, a, b))),
+            (0..=((axis_val_multiplier * x_max.floor()) as i32))
+                .map(|x| (x as f64) / axis_val_multiplier)
+                .map(|x| (x, c * bounded_log(x, a1, a2, a3))),
             &BLUE,
         ))?;
     }
