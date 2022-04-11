@@ -87,8 +87,11 @@ pub fn entropies_scored<const N: usize>(
             };
 
             // the less the better
-            let left_diff =
-                bounded_log_c(uncertainty - entropies_data.entropy, Calibration::default())
+            // we add 1 to bounded_log_c because we assume the guess is not correct
+            // so we must take at least one more turn
+            let left_diff = prob
+                + (1.
+                    + bounded_log_c(uncertainty - entropies_data.entropy, Calibration::default()))
                     * (1. - prob);
 
             (i, entropies_data, left_diff)

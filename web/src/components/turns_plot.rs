@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Result};
 use plotters::prelude::*;
 use plotters_canvas::CanvasBackend;
 use web_sys::HtmlCanvasElement;
@@ -8,7 +9,8 @@ fn draw_plot(
     canvas: HtmlCanvasElement,
     data_with_weights: &[(f64, f64, f64)],
     words_len: usize,
-) -> Result<(), Box<dyn std::error::Error>> {
+    title: &str,
+) -> Result<()> {
     let root = CanvasBackend::with_canvas_object(canvas)
         .unwrap()
         .into_drawing_area();
@@ -17,12 +19,6 @@ fn draw_plot(
         .into_iter()
         .copied()
         .map(|(c1, c2, _)| (c1, c2))
-        .collect::<Vec<_>>();
-
-    let weights = data_with_weights
-        .into_iter()
-        .copied()
-        .map(|(_, _, c3)| c3)
         .collect::<Vec<_>>();
 
     let y_max = 1.
@@ -54,9 +50,15 @@ fn draw_plot(
         }
     }
 
-    let bar_data = bars
+    let bars = bars
         .into_iter()
         .filter(|(_, bar_vec)| bar_vec.len() > 0)
+        .collect::<Vec<_>>();
+
+    let weights = bars.iter().map(|_| 1.).collect::<Vec<f64>>();
+
+    let bar_data = bars
+        .into_iter()
         .map(|(x, bar_vec)| {
             let norm: f64 = bar_vec.iter().map(|&(_, prob)| prob).sum();
             (
@@ -70,6 +72,7 @@ fn draw_plot(
     let root = root.margin(10u32, 10u32, 10u32, 10u32);
     let mut chart = ChartBuilder::on(&root)
         .margin(5u32)
+        .caption(title, ("sans-serif", 30.0).into_font())
         .x_label_area_size(30u32)
         .y_label_area_size(30u32)
         .build_cartesian_2d(0f64..x_max, 0f64..y_max)?
@@ -97,8 +100,9 @@ fn draw_plot(
         .collect::<Vec<_>>();
 
     let axis_val_multiplier = 5.;
-    if data.len() >= 4 {
-        let calibration = fit(fit_data);
+    if fit_data.len() >= 4 {
+        let calibration = fit(fit_data, weights).map_err(|e| anyhow!("{e}"))?;
+        let Calibration { c, a0, a1, a2 } = calibration;
         chart
             .draw_series(LineSeries::new(
                 (0..=((axis_val_multiplier * x_max.floor()) as i32))
@@ -106,7 +110,7 @@ fn draw_plot(
                     .map(|x| (x, bounded_log_c(x, calibration))),
                 &RED,
             ))?
-            .label(format!("{calibration:#?}"))
+            .label(format!("{c:.3} min(1, {a0:.3} + {a1:.3} (x + {a2:.3}))"))
             .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &RED));
     }
 
@@ -138,15 +142,14 @@ fn draw_plot(
         .border_style(&BLACK)
         .draw()?;
 
-    root.present().expect("Unable to draw");
-
-    Ok(())
+    Ok(root.present().map_err(anyhow::Error::msg)?)
 }
 
 #[derive(Properties, PartialEq)]
 pub struct Props {
     pub data: Vec<(f64, f64, f64)>,
     pub words_len: usize,
+    pub title: String,
 }
 
 #[function_component(TurnsPlot)]
@@ -154,12 +157,15 @@ pub fn view(props: &Props) -> Html {
     let canvas_node_ref = use_node_ref();
     let data = props.data.clone();
     let words_len = props.words_len;
+    let title = props.title.clone();
 
     {
         let canvas_node_ref = canvas_node_ref.clone();
         use_effect(move || {
             let canvas = canvas_node_ref.cast::<HtmlCanvasElement>().unwrap();
-            draw_plot(canvas, &data[..], words_len).unwrap();
+            match draw_plot(canvas, &data[..], words_len, &title) {
+                _ => (),
+            }
             || ()
         });
     }

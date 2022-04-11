@@ -1,30 +1,37 @@
 use nalgebra::{DVector, Scalar};
 use num::One;
 use num_traits::Float;
+use thiserror::Error;
+use varpro::model::builder::error::ModelBuildError;
 use varpro::prelude::*;
 use varpro::solvers::levmar::{LevMarProblemBuilder, LevMarSolver};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Calibration {
-    c: f64,
-    a0: f64,
-    a1: f64,
-    a2: f64,
+    pub c: f64,
+    pub a0: f64,
+    pub a1: f64,
+    pub a2: f64,
 }
 
 impl Default for Calibration {
     fn default() -> Self {
         Self {
-            c: 0.2372,
-            a0: -2.1664,
-            a1: 10.209,
-            a2: 2.4787,
+            c: 0.662,
+            a0: -1.796,
+            a1: 2.496,
+            a2: 2.942,
         }
     }
 }
 
 pub fn bounded_log_c(x: f64, Calibration { c, a0, a1, a2 }: Calibration) -> f64 {
-    c * bounded_log(x, a0, a1, a2)
+    let val = c * bounded_log(x, a0, a1, a2);
+    if val > 1. {
+        val
+    } else {
+        1.
+    }
 }
 
 pub fn bounded_log<S: Scalar + Float>(x: S, a0: S, a1: S, a2: S) -> S {
@@ -73,8 +80,19 @@ pub fn bounded_log_da2<S: Scalar + Float>(x: &DVector<S>, a0: S, a1: S, a2: S) -
     })
 }
 
-pub fn fit(data: Vec<(f64, f64)>) -> Calibration {
+#[derive(Error, Debug)]
+pub enum FitError {
+    #[error("Unable to build model")]
+    ModelBuildUnsuccessful(#[from] ModelBuildError),
+    #[error("Unable to build problem")]
+    ProblemBuildUnsuccessful,
+    #[error("Unable to fit")]
+    FitUnsuccessful,
+}
+
+pub fn fit(data: Vec<(f64, f64)>, weights: Vec<f64>) -> Result<Calibration, FitError> {
     let (x, y): (Vec<_>, Vec<_>) = data.into_iter().unzip();
+    let Calibration { a0, a1, a2, .. } = Calibration::default();
 
     let model = SeparableModelBuilder::<f64>::new(&["a0", "a1", "a2"])
         .function(&["a0", "a1", "a2"], bounded_log_v)
@@ -82,25 +100,29 @@ pub fn fit(data: Vec<(f64, f64)>) -> Calibration {
         .partial_deriv("a1", bounded_log_da1)
         .partial_deriv("a2", bounded_log_da2)
         .build()
-        .unwrap();
+        .map_err(FitError::from)?;
 
     let problem = LevMarProblemBuilder::new()
         .model(&model)
         .x(x)
         .y(y)
-        .initial_guess(&[-2., 3., 1.])
+        .weights(weights)
+        .initial_guess(&[a0, a1, a2])
         .build()
-        .unwrap();
+        .map_err(|_| FitError::ProblemBuildUnsuccessful)?;
 
     let (solved_problem, report) = LevMarSolver::new().minimize(problem);
-    assert!(report.termination.was_successful());
+    if !report.termination.was_successful() {
+        return Err(FitError::FitUnsuccessful);
+    }
+
     let alpha = solved_problem.params();
     let c = solved_problem.linear_coefficients().unwrap();
 
-    Calibration {
+    Ok(Calibration {
         c: c[0],
         a0: alpha[0],
         a1: alpha[1],
         a2: alpha[2],
-    }
+    })
 }

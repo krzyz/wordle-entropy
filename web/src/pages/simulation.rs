@@ -16,6 +16,33 @@ use crate::worker::{WordleWorkerInput, WordleWorkerOutput};
 use crate::worker_atom::WordleWorkerAtom;
 use crate::{EntropiesData, Hints, Word};
 
+fn get_expected_turns(history: &Vec<Vec<(usize, Hints, f64)>>, word_set: &WordSet) -> f64 {
+    let (part_weighted_turns, prob_norm): (Vec<_>, Vec<_>) = history
+        .iter()
+        .map(|words| {
+            let turns = words.len();
+            words
+                .last()
+                .map(|&(word, _, _)| {
+                    let probability = word_set.dictionary.probabilities[word];
+                    (probability * turns as f64, probability)
+                })
+                .unwrap_or((0., 0.))
+        })
+        .unzip();
+
+    let (part_weighted_turns, prob_norm): (f64, f64) = (
+        part_weighted_turns.into_iter().sum(),
+        prob_norm.into_iter().sum(),
+    );
+
+    if prob_norm != 0. {
+        part_weighted_turns / prob_norm
+    } else {
+        0.
+    }
+}
+
 enum SimulationStateAction {
     Initialize(Word, Vec<Word>, Rc<WordSet>),
     NextStep {
@@ -35,9 +62,11 @@ struct SimulationState {
     current_word: Option<Word>,
     last_hints: Option<Hints>,
     last_guess: Option<usize>,
+    last_scores: Vec<(usize, f64, bool)>,
     history: Vec<Vec<(usize, Hints, f64)>>,
     words_left: Vec<Word>,
     word_set: Option<Rc<WordSet>>,
+    expected_turns: f64,
 }
 
 impl Reducible for SimulationState {
@@ -51,9 +80,11 @@ impl Reducible for SimulationState {
                 current_word: Some(word),
                 last_hints: None,
                 last_guess: None,
+                last_scores: vec![],
                 history: vec![],
                 words_left,
                 word_set: Some(word_set),
+                expected_turns: 0.,
             }),
             SimulationStateAction::NextStep {
                 next_word,
@@ -67,6 +98,12 @@ impl Reducible for SimulationState {
                 let mut current_turns = self.current_turns.clone();
                 let mut turns_data = self.turns_data.clone();
                 let mut history = self.history.clone();
+                let mut expected_turns = self.expected_turns;
+
+                let last_scores = scores
+                    .into_iter()
+                    .map(|(word, _, score)| (word, score, answers.contains(&word)))
+                    .collect();
 
                 let mut last_optn: Option<&mut Vec<(usize, Hints, f64)>>;
                 let history_last = if let Some(history_last) = history.last_mut() {
@@ -78,33 +115,40 @@ impl Reducible for SimulationState {
                 };
                 history_last.push((guess, hints.clone(), uncertainty));
 
+                current_turns.push((uncertainty, current_turns.len() as f64));
+
                 let word = if answers.len() == 1 {
-                    let mut turns_num = current_turns.len();
+                    let turns_num = current_turns.len();
 
                     let answer = answers[0];
                     if answer != guess {
                         history_last.push((answer, Hints::correct(), 0.));
-                        turns_num += 1;
                     }
                     if words_left.len() > 0 {
                         words_left.remove(0);
                     }
-                    turns_data.extend(current_turns.iter().map(|&(uncertainty, turn)| {
-                        (
-                            uncertainty,
-                            turns_num as f64 - turn,
-                            self.word_set
-                                .as_ref()
-                                .expect("Word set not available")
-                                .dictionary
-                                .probabilities[guess],
-                        )
-                    }));
+                    turns_data.extend(
+                        current_turns
+                            .iter()
+                            .map(|&(uncertainty, turn)| {
+                                (
+                                    uncertainty,
+                                    turns_num as f64 - turn - 1., // that additional one is already in the score
+                                    self.word_set // as we're interested only in failed guesses
+                                        .as_ref()
+                                        .expect("Word set not available")
+                                        .dictionary
+                                        .probabilities[guess],
+                                )
+                            })
+                            .filter(|&(_, turn, _)| turn > 0.),
+                    );
                     current_turns = vec![];
+
+                    expected_turns = get_expected_turns(&history, self.word_set.as_ref().unwrap());
                     history.push(vec![]);
                     next_word
                 } else {
-                    current_turns.push((uncertainty, current_turns.len() as f64));
                     self.current_word.clone()
                 };
 
@@ -114,9 +158,11 @@ impl Reducible for SimulationState {
                     current_word: word,
                     last_hints: Some(hints),
                     last_guess: Some(guess),
+                    last_scores,
                     history,
                     words_left: words_left,
                     word_set: self.word_set.clone(),
+                    expected_turns,
                 })
             }
         }
@@ -146,7 +192,6 @@ pub fn view() -> Html {
         let send_queue = send_queue.clone();
         let simulation_state = simulation_state.clone();
         let words_left = words_left.clone();
-        let word_set = word_set.clone();
         move |output: WordleWorkerOutput| match output {
             WordleWorkerOutput::SetWordSet(name) => log::info!("Set worker with: {name}"),
             WordleWorkerOutput::Simulation(output) => match output {
@@ -157,17 +202,12 @@ pub fn view() -> Html {
                     scores,
                     answers,
                 } => {
-                    let words = scores
+                    let next_guess = scores
                         .iter()
-                        .take(10)
-                        .map(|(word_ind, EntropiesData { entropy, .. }, _)| {
-                            let word = &word_set.dictionary.words[*word_ind];
-                            format!("{word}: {entropy}")
-                        })
-                        .collect::<Vec<_>>()
-                        .join(", ");
-
-                    let next_guess = scores.iter().next().unwrap().0;
+                        .filter(|&&(candidate, ..)| candidate != guess)
+                        .next()
+                        .unwrap()
+                        .0;
 
                     let next_word = if answers.len() > 1 {
                         match send_queue.try_borrow_mut() {
@@ -326,10 +366,22 @@ pub fn view() -> Html {
                 disabled={!running}
             >{ "Step" }</button>
             <div class="columns">
-                <div class="column">
-                    <TurnsPlot {data} {words_len} />
+                <div class="column col-8 col-xl-12">
+                    <TurnsPlot {data} {words_len} title={format!("Expected turns: {}", simulation_state.expected_turns)} />
                 </div>
-                <div class="column">
+                <div class="column col-3 col-xl-9">
+                    <ul class="words_left_list">
+                        {
+                            simulation_state.last_scores.iter().map(|&(word, score, could_be_answer)| {
+                                let word = &word_set.dictionary.words[word];
+                                html! {
+                                    <li> { format!("{word}: {score} | {could_be_answer:#?}")} </li>
+                                }
+                            }).collect::<Html>()
+                        }
+                    </ul>
+                </div>
+                <div class="column col-1 col-xl-3">
                     <div>
                         if let Some(ref word) = simulation_state.current_word {
                             <p> { word } </p>
@@ -349,11 +401,11 @@ pub fn view() -> Html {
             </div>
             <div>
                 {
-                    simulation_state.history.iter().map(|row| {
+                    simulation_state.history.iter().rev().map(|row| {
                         html! {
                             <p>
                                 {
-                                    row.iter().map(|(word, hints, _uncertainty)| {
+                                    row.iter().map(|(word, hints, _)| {
                                         let word = word_set.dictionary.words[*word].clone();
                                         let hints = hints.clone();
                                         html! {
