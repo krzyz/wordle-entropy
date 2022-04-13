@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::rc::Rc;
 
-use rand::{seq::IteratorRandom, thread_rng};
+use rand::{seq::IteratorRandom, seq::SliceRandom, thread_rng};
 use serde_cbor::ser::to_vec_packed;
 use yew::{
     function_component, html, use_effect_with_deps, use_mut_ref, use_reducer, use_state, Callback,
@@ -298,12 +298,14 @@ pub fn view() -> Html {
             let mut words = match *selected_words.borrow() {
                 SelectedWords::Random(n) => {
                     let mut rng = thread_rng();
-                    word_set
+                    let mut words_selected = word_set
                         .dictionary
                         .words
                         .iter()
                         .cloned()
-                        .choose_multiple(&mut rng, n)
+                        .choose_multiple(&mut rng, n);
+                    words_selected.shuffle(&mut rng);
+                    words_selected
                 }
                 SelectedWords::Custom(ref words) => words.clone(),
             };
