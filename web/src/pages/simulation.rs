@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::rc::Rc;
 
 use rand::{seq::IteratorRandom, thread_rng};
@@ -16,18 +17,12 @@ use crate::worker::{WordleWorkerInput, WordleWorkerOutput};
 use crate::worker_atom::WordleWorkerAtom;
 use crate::{EntropiesData, Hints, Word};
 
-fn get_expected_turns(history: &Vec<Vec<(usize, Hints, f64)>>, word_set: &WordSet) -> f64 {
-    let (part_weighted_turns, prob_norm): (Vec<_>, Vec<_>) = history
+fn get_expected_turns(history_small: &Vec<(usize, usize)>, word_set: &WordSet) -> f64 {
+    let (part_weighted_turns, prob_norm): (Vec<_>, Vec<_>) = history_small
         .iter()
-        .map(|words| {
-            let turns = words.len();
-            words
-                .last()
-                .map(|&(word, _, _)| {
-                    let probability = word_set.dictionary.probabilities[word];
-                    (probability * turns as f64, probability)
-                })
-                .unwrap_or((0., 0.))
+        .map(|&(turns, word)| {
+            let probability = word_set.dictionary.probabilities[word];
+            (probability * turns as f64, probability)
         })
         .unzip();
 
@@ -63,7 +58,8 @@ struct SimulationState {
     last_hints: Option<Hints>,
     last_guess: Option<usize>,
     last_scores: Vec<(usize, f64, bool)>,
-    history: Vec<Vec<(usize, Hints, f64)>>,
+    history: VecDeque<Vec<(usize, Hints, f64)>>,
+    history_small: Vec<(usize, usize)>,
     words_left: Vec<Word>,
     word_set: Option<Rc<WordSet>>,
     expected_turns: f64,
@@ -81,7 +77,8 @@ impl Reducible for SimulationState {
                 last_hints: None,
                 last_guess: None,
                 last_scores: vec![],
-                history: vec![],
+                history: VecDeque::new(),
+                history_small: vec![],
                 words_left,
                 word_set: Some(word_set),
                 expected_turns: 0.,
@@ -98,6 +95,7 @@ impl Reducible for SimulationState {
                 let mut current_turns = self.current_turns.clone();
                 let mut turns_data = self.turns_data.clone();
                 let mut history = self.history.clone();
+                let mut history_small = self.history_small.clone();
                 let mut expected_turns = self.expected_turns;
 
                 let last_scores = scores
@@ -106,14 +104,14 @@ impl Reducible for SimulationState {
                     .collect();
 
                 let mut last_optn: Option<&mut Vec<(usize, Hints, f64)>>;
-                let history_last = if let Some(history_last) = history.last_mut() {
-                    history_last
+                let history_front = if let Some(history_front) = history.front_mut() {
+                    history_front
                 } else {
-                    history.push(vec![]);
-                    last_optn = history.last_mut();
+                    history.push_front(vec![]);
+                    last_optn = history.front_mut();
                     &mut **last_optn.as_mut().unwrap()
                 };
-                history_last.push((guess, hints.clone(), uncertainty));
+                history_front.push((guess, hints.clone(), uncertainty));
 
                 current_turns.push((uncertainty, current_turns.len() as f64));
 
@@ -122,7 +120,7 @@ impl Reducible for SimulationState {
 
                     let answer = answers[0];
                     if answer != guess {
-                        history_last.push((answer, Hints::correct(), 0.));
+                        history_front.push((answer, Hints::correct(), 0.));
                     }
                     if words_left.len() > 0 {
                         words_left.remove(0);
@@ -145,8 +143,13 @@ impl Reducible for SimulationState {
                     );
                     current_turns = vec![];
 
-                    expected_turns = get_expected_turns(&history, self.word_set.as_ref().unwrap());
-                    history.push(vec![]);
+                    history_small.push((history_front.len(), answer));
+                    expected_turns =
+                        get_expected_turns(&history_small, self.word_set.as_ref().unwrap());
+                    if history.len() > 10 {
+                        history.pop_back();
+                    }
+                    history.push_front(vec![]);
                     next_word
                 } else {
                     self.current_word.clone()
@@ -160,6 +163,7 @@ impl Reducible for SimulationState {
                     last_guess: Some(guess),
                     last_scores,
                     history,
+                    history_small,
                     words_left: words_left,
                     word_set: self.word_set.clone(),
                     expected_turns,
@@ -351,6 +355,8 @@ pub fn view() -> Html {
     let words_len = word_set.dictionary.words.len();
     let running = !simulation_state.words_left.is_empty();
 
+    log::info!("{:#?}", simulation_state.history);
+
     html! {
         <section>
             <SelectWords dictionary={word_set.dictionary.clone()} {on_words_set} />
@@ -401,7 +407,7 @@ pub fn view() -> Html {
             </div>
             <div>
                 {
-                    simulation_state.history.iter().rev().map(|row| {
+                    simulation_state.history.iter().map(|row| {
                         html! {
                             <p>
                                 {

@@ -102,7 +102,7 @@ fn draw_plot(
     let axis_val_multiplier = 5.;
     if fit_data.len() >= 4 {
         let calibration = fit(fit_data, weights).map_err(|e| anyhow!("{e}"))?;
-        let Calibration { c, a0, a1, a2 } = calibration;
+        let Calibration { c, a0, a1 } = calibration;
         chart
             .draw_series(LineSeries::new(
                 (0..=((axis_val_multiplier * x_max.floor()) as i32))
@@ -110,7 +110,7 @@ fn draw_plot(
                     .map(|x| (x, bounded_log_c(x, calibration))),
                 &RED,
             ))?
-            .label(format!("{c:.3} min(1, {a0:.3} + {a1:.3} (x + {a2:.3}))"))
+            .label(format!("{c:.3} ln({a0:.3} (x + {a1:.3}))"))
             .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &RED));
     }
 
