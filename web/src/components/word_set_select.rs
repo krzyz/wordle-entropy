@@ -1,12 +1,14 @@
 use crate::word_set::{WordSet, WordSetVec, WordSetVecAction};
 use crate::WORD_SIZE;
-use bounce::{use_atom, use_slice, Atom};
+use bounce::{use_atom, use_atom_setter, use_slice, Atom};
 use reqwest::StatusCode;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
 use wordle_entropy_core::data::parse_words;
 use yew::events::Event;
 use yew::{function_component, html, use_effect, Callback, Html, TargetCast};
+
+use super::toast::{ToastOption, ToastType};
 
 #[derive(Default, PartialEq, Atom)]
 pub struct WordSetSelection(pub Option<String>);
@@ -15,9 +17,11 @@ pub struct WordSetSelection(pub Option<String>);
 pub fn word_set_select() -> Html {
     let word_sets = use_slice::<WordSetVec>();
     let selected = use_atom::<WordSetSelection>();
+    let set_toast = use_atom_setter::<ToastOption>();
 
     {
         let word_sets = word_sets.clone();
+        let set_toast = set_toast.clone();
         use_effect(move || {
             if word_sets.0.len() == 0 {
                 spawn_local(async move {
@@ -38,9 +42,15 @@ pub fn word_set_select() -> Html {
                                     dictionary.unwrap(),
                                 ),
                             )));
-                            log::info!("Loaded from url");
+                            set_toast(ToastOption::new(
+                                "Loaded from url".to_string(),
+                                ToastType::Success,
+                            ));
                         }
-                        _ => log::info!("Error loading csv"),
+                        _ => set_toast(ToastOption::new(
+                            "Error loading csv".to_string(),
+                            ToastType::Error,
+                        )),
                     }
                 });
             } else {
@@ -52,14 +62,17 @@ pub fn word_set_select() -> Html {
     let onchange = {
         let selected = use_atom::<WordSetSelection>();
         Callback::from(move |e: Event| {
-            log::info!("on select change");
             let select: HtmlInputElement = e.target_unchecked_into();
             selected.set(WordSetSelection(Some(select.value().clone())));
         })
     };
 
     if word_sets.0.len() > 0 && *selected == WordSetSelection(None) {
-        log::info!("empty word_sets");
+        set_toast(ToastOption::new(
+            "Empty Word Set".to_string(),
+            ToastType::Warning,
+        ));
+
         selected.set(WordSetSelection(Some(
             word_sets.0.iter().next().unwrap().name.clone(),
         )));

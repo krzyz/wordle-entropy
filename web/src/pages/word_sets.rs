@@ -1,9 +1,10 @@
 use crate::{
+    components::toast::{ToastOption, ToastType},
     main_app::Route,
     word_set::{WordSetVec, WordSetVecAction},
     WORD_SIZE,
 };
-use bounce::{use_slice, use_slice_dispatch};
+use bounce::{use_atom_setter, use_slice, use_slice_dispatch};
 use gloo_file::callbacks::read_as_text;
 use web_sys::HtmlInputElement;
 use wordle_entropy_core::data::parse_words;
@@ -16,15 +17,18 @@ pub fn form() -> Html {
     let file_input_node_ref = use_node_ref();
     let name_input_node_ref = use_node_ref();
     let file_reader = use_mut_ref(|| None);
+    let set_toast = use_atom_setter::<ToastOption>();
 
     let onload = {
         let file_reader = file_reader.clone();
         let file_input_node_ref = file_input_node_ref.clone();
         let name_input_node_ref = name_input_node_ref.clone();
         let dispatch_word_set = dispatch_word_set.clone();
+        let set_toast = set_toast.clone();
 
         Callback::from(move |e: FocusEvent| {
             let dispatch_word_set = dispatch_word_set.clone();
+            let set_toast = set_toast.clone();
             e.prevent_default();
             let name_input = name_input_node_ref.cast::<HtmlInputElement>().unwrap();
             let name = name_input.value();
@@ -45,14 +49,18 @@ pub fn form() -> Html {
                                         dictionary.unwrap(),
                                     ));
                                 }
-                                Err(err) => {
-                                    log::info!("Reading file error: {err}");
-                                }
+                                Err(err) => set_toast(ToastOption::new(
+                                    format!("Reading file error: {err}").to_string(),
+                                    ToastType::Error,
+                                )),
                             }));
                     }
                 }
             } else {
-                log::info!("Name can't be empty!");
+                set_toast(ToastOption::new(
+                    "Name can't be empty!".to_string(),
+                    ToastType::Error,
+                ))
             }
         })
     };

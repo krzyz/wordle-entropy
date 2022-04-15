@@ -1,4 +1,4 @@
-use crate::components::word_set_select::WordSetSelect;
+use crate::components::{toast::ToastComponent, word_set_select::WordSetSelect};
 use crate::pages::{
     entropy_calculation::EntropyCalculation, page_not_found::PageNotFound, simulation::Simulation,
     solver::Solver, word_sets::WordSets,
@@ -30,6 +30,7 @@ pub fn view() -> Html {
     html! {
         <BounceRoot>
             <BrowserRouter>
+                <ToastComponent />
                 <nav class="navbar">
                     <section class="navbar-section">
                         <Link<Route> classes="btn btn-link" to={Route::WordSets}>
