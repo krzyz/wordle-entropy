@@ -32,8 +32,8 @@ pub fn start() {
     } else {
         spawn_local(async move {
             match JsFuture::from(init_thread_pool(12)).await {
-                Ok(_) => log::info!("init ok"),
-                Err(e) => log::info!("error: {:#?}", e),
+                Ok(_) => (),
+                Err(e) => log::error!("error: {:#?}", e),
             }
             <worker::WordleWorker as PublicWorker>::register();
         });

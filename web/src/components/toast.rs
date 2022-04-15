@@ -1,6 +1,8 @@
 use bounce::{use_atom, Atom};
-use yew::{classes, function_component, html, Callback};
+use gloo_timers::callback::Timeout;
+use yew::{classes, function_component, html, use_effect, Callback};
 
+#[allow(dead_code)]
 #[derive(PartialEq)]
 pub enum ToastType {
     Info,
@@ -9,10 +11,15 @@ pub enum ToastType {
     Error,
 }
 
-#[derive(PartialEq)]
 pub struct Toast {
     message: String,
     t_type: ToastType,
+}
+
+impl PartialEq for Toast {
+    fn eq(&self, _other: &Self) -> bool {
+        false
+    }
 }
 
 #[derive(Default, PartialEq, Atom)]
@@ -31,7 +38,21 @@ impl ToastOption {
 #[function_component(ToastComponent)]
 pub fn view() -> Html {
     let toast_atom = use_atom::<ToastOption>();
+
     if let Some(toast) = &toast_atom.0 {
+        {
+            let toast_atom = toast_atom.clone();
+            use_effect(move || {
+                let timeout = {
+                    let toast_atom = toast_atom.clone();
+                    Timeout::new(3_000, move || toast_atom.set(ToastOption::none()))
+                };
+                || {
+                    timeout.cancel();
+                }
+            })
+        }
+
         let toast_class = match toast.t_type {
             ToastType::Info => "toast-primary",
             ToastType::Success => "toast-success",
@@ -47,9 +68,17 @@ pub fn view() -> Html {
         };
 
         html! {
-            <div class={classes!("toast", toast_class)}>
-                <button class="btn btn-clear float-right" {onclick}></button>
-                { &toast.message }
+            <div class="container p-absolute">
+                <div class="columns">
+                    <div class="column col-5 col-xl-4 hide-md"/>
+                    <div style="padding-right: 0px" class="column col-2 col-xl-4 col-md-12">
+                        <div class={classes!("toast", toast_class)}>
+                            <button class="btn btn-clear float-right" {onclick}></button>
+                            { &toast.message }
+                        </div>
+                    </div>
+                    <div class="column col-5 col-xl-4 hide-md"/>
+                </div>
             </div>
         }
     } else {

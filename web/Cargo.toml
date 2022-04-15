@@ -56,10 +56,6 @@ features = [
   'PerformanceTiming',
 ]
 
-[dev-dependencies]
-serde_json = "1"
-wasm-bindgen-test = "0.3.29"
-
 [package.metadata.wasm-pack.profile.dev]
 wasm-opt = false
 
@@ -68,6 +64,7 @@ wasm-opt = ['-O4']
 
 [patch.crates-io]
 gloo-console = { git = "https://github.com/krzyz/gloo" }
+gloo-timers = { git = "https://github.com/krzyz/gloo" }
 
 [profile.release]
 opt-level = 3

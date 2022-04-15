@@ -25,7 +25,6 @@ impl WordleWorkerAtom {
             let worker = worker.clone();
             use_effect_with_deps(
                 move |_| {
-                    log::info!("initialize worker with callback");
                     worker.set_callback(cb);
                     || ()
                 },
@@ -45,7 +44,6 @@ impl PartialEq for WordleWorkerAtom {
 
 impl Default for WordleWorkerAtom {
     fn default() -> Self {
-        log::info!("default");
         let cb = |_| ();
         Self(Rc::new(RefCell::new(WordleWorker::bridge(Rc::new(cb)))))
     }

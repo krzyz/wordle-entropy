@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 use std::rc::Rc;
 
+use bounce::use_atom_setter;
 use rand::{seq::IteratorRandom, seq::SliceRandom, thread_rng};
 use serde_cbor::ser::to_vec_packed;
 use yew::{
@@ -10,6 +11,7 @@ use yew::{
 
 use crate::components::hinted_word::HintedWord;
 use crate::components::select_words::{SelectWords, SelectedWords};
+use crate::components::toast::{ToastOption, ToastType};
 use crate::components::turns_plot::TurnsPlot;
 use crate::simulation::{SimulationInput, SimulationOutput};
 use crate::word_set::{get_current_word_set, WordSet};
@@ -183,6 +185,8 @@ pub fn view() -> Html {
     let next_step = use_state(|| false);
     let send_queue = use_mut_ref(|| -> Option<SimulationInput> { None });
     let words_left = use_mut_ref(|| -> Vec<Word> { vec![] });
+    let set_toast = use_atom_setter::<ToastOption>();
+
     *words_left.borrow_mut() = simulation_state.words_left.clone();
 
     let on_words_set = {
@@ -196,8 +200,10 @@ pub fn view() -> Html {
         let send_queue = send_queue.clone();
         let simulation_state = simulation_state.clone();
         let words_left = words_left.clone();
+        let set_toast = set_toast.clone();
+
         move |output: WordleWorkerOutput| match output {
-            WordleWorkerOutput::SetWordSet(name) => log::info!("Set worker with: {name}"),
+            WordleWorkerOutput::SetWordSet(_name) => (),
             WordleWorkerOutput::Simulation(output) => match output {
                 SimulationOutput::StepComplete {
                     guess,
@@ -218,19 +224,18 @@ pub fn view() -> Html {
                             Ok(ref mut send_queue) => {
                                 **send_queue = Some(SimulationInput::Continue(Some(next_guess)));
                             }
-                            _ => log::info!("Unable to borrow in worker callback 1"),
+                            _ => log::error!("Unable to borrow in worker callback 1"),
                         }
                         None
                     } else {
                         if words_left.borrow().len() > 0 {
                             let next_word = &words_left.borrow()[0];
-                            log::info!("Starting next word: {next_word}");
                             match send_queue.try_borrow_mut() {
                                 Ok(ref mut send_queue) => {
                                     **send_queue =
                                         Some(SimulationInput::Start(next_word.clone(), None));
                                 }
-                                _ => log::info!("Unable to borrow in worker callback 2"),
+                                _ => log::error!("Unable to borrow in worker callback 2"),
                             }
                             Some(next_word.clone())
                         } else {
@@ -249,10 +254,14 @@ pub fn view() -> Html {
                 }
                 SimulationOutput::Stopped => todo!(),
             },
-            WordleWorkerOutput::Err(error) => {
-                log::info!("{error}");
-            }
-            _ => log::info!("Unexpected worker output"),
+            WordleWorkerOutput::Err(err) => set_toast(ToastOption::new(
+                format!("Worker error: {err}").to_string(),
+                ToastType::Error,
+            )),
+            _ => set_toast(ToastOption::new(
+                "Unexpected worker output".to_string(),
+                ToastType::Error,
+            )),
         }
     };
 
@@ -266,7 +275,7 @@ pub fn view() -> Html {
                     next_step.set(false);
                 }
             }
-            _ => log::info!("unable to borrow in queue resolution"),
+            _ => log::error!("unable to borrow in queue resolution"),
         }
     }
 
@@ -320,8 +329,6 @@ pub fn view() -> Html {
                 worker.send(WordleWorkerInput::Simulation(SimulationInput::Start(
                     word, None,
                 )));
-            } else {
-                log::info!("..no words?");
             }
         })
     };
@@ -357,12 +364,14 @@ pub fn view() -> Html {
     let words_len = word_set.dictionary.words.len();
     let running = !simulation_state.words_left.is_empty();
 
-    log::info!("{:#?}", simulation_state.history);
-
     html! {
         <section>
             <SelectWords dictionary={word_set.dictionary.clone()} {on_words_set} />
-            <button class="btn btn-primary" onclick={on_start_button_click}>{ "Start" }</button>
+            <button
+                class="btn btn-primary"
+                onclick={on_start_button_click}
+                disabled={words_len > 0}
+            >{ "Start" }</button>
             <button
                 class="btn btn-primary"
                 onclick={on_continue_button_click}

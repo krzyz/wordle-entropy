@@ -158,6 +158,5 @@ pub fn get_current_word_set() -> WordSet {
             Dictionary::new(vec![], vec![]),
         ));
 
-    log::info!("Word set: {}", word_set.name);
     word_set
 }

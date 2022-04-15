@@ -1,15 +1,58 @@
+use std::rc::Rc;
+
+use anyhow::{anyhow, Result};
+use bounce::{use_atom_setter, use_slice, use_slice_dispatch};
+use gloo_file::{
+    callbacks::{read_as_text, FileReader},
+    FileList, FileReadError,
+};
+use web_sys::HtmlInputElement;
+use wordle_entropy_core::data::parse_words;
+use yew::{function_component, html, use_mut_ref, use_node_ref, Callback, FocusEvent, Html};
+use yew_router::components::Link;
+
 use crate::{
     components::toast::{ToastOption, ToastType},
     main_app::Route,
     word_set::{WordSetVec, WordSetVecAction},
     WORD_SIZE,
 };
-use bounce::{use_atom_setter, use_slice, use_slice_dispatch};
-use gloo_file::callbacks::read_as_text;
-use web_sys::HtmlInputElement;
-use wordle_entropy_core::data::parse_words;
-use yew::{function_component, html, use_mut_ref, use_node_ref, Callback, FocusEvent, Html};
-use yew_router::components::Link;
+
+fn handle_file(
+    name: String,
+    content: std::result::Result<String, FileReadError>,
+    dispatch_word_set: Rc<dyn Fn(WordSetVecAction)>,
+) -> Result<()> {
+    let content = content?;
+    let dictionary = parse_words::<_, WORD_SIZE>(content.lines())?;
+
+    dispatch_word_set(WordSetVecAction::LoadWords(name, dictionary));
+    Ok(())
+}
+
+fn load_from_file(
+    name: String,
+    files: Option<FileList>,
+    dispatch_word_set: Rc<dyn Fn(WordSetVecAction)>,
+    set_toast: Rc<dyn Fn(ToastOption)>,
+) -> Result<FileReader> {
+    if name.is_empty() {
+        return Err(anyhow!("Name can't be empty!"));
+    }
+
+    let files = files.ok_or(anyhow!("No file selected!"))?;
+    let file = files.first().ok_or(anyhow!("No file selected!"))?;
+
+    Ok(read_as_text(&file, move |res| {
+        match handle_file(name, res, dispatch_word_set) {
+            Ok(_) => (),
+            Err(err) => set_toast(ToastOption::new(
+                format!("Reading file error: {err}").to_string(),
+                ToastType::Error,
+            )),
+        }
+    }))
+}
 
 #[function_component(AddWordSetForm)]
 pub fn form() -> Html {
@@ -32,35 +75,18 @@ pub fn form() -> Html {
             e.prevent_default();
             let name_input = name_input_node_ref.cast::<HtmlInputElement>().unwrap();
             let name = name_input.value();
-            if name != "" {
-                let file_input = file_input_node_ref.cast::<HtmlInputElement>().unwrap();
-                let files = file_input
-                    .files()
-                    .map(|files| gloo_file::FileList::from(files));
 
-                if let Some(files) = files {
-                    if let Some(file) = files.first() {
-                        *file_reader.borrow_mut() =
-                            Some(read_as_text(&file, move |res| match res {
-                                Ok(content) => {
-                                    let dictionary = parse_words::<_, WORD_SIZE>(content.lines());
-                                    dispatch_word_set(WordSetVecAction::LoadWords(
-                                        name,
-                                        dictionary.unwrap(),
-                                    ));
-                                }
-                                Err(err) => set_toast(ToastOption::new(
-                                    format!("Reading file error: {err}").to_string(),
-                                    ToastType::Error,
-                                )),
-                            }));
-                    }
-                }
-            } else {
-                set_toast(ToastOption::new(
-                    "Name can't be empty!".to_string(),
+            let file_input = file_input_node_ref.cast::<HtmlInputElement>().unwrap();
+            let files = file_input
+                .files()
+                .map(|files| gloo_file::FileList::from(files));
+
+            match load_from_file(name, files, dispatch_word_set, set_toast.clone()) {
+                Ok(loaded_file_reader) => *file_reader.borrow_mut() = Some(loaded_file_reader),
+                Err(err) => set_toast(ToastOption::new(
+                    format!("Reading file error: {err}").to_string(),
                     ToastType::Error,
-                ))
+                )),
             }
         })
     };

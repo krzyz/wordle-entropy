@@ -12,7 +12,7 @@ fn draw_plot(
     title: &str,
 ) -> Result<()> {
     let root = CanvasBackend::with_canvas_object(canvas)
-        .unwrap()
+        .ok_or(anyhow!("Unable to initialize plot backend from canvas"))?
         .into_drawing_area();
 
     let data = data_with_weights
@@ -25,7 +25,7 @@ fn draw_plot(
         + data
             .iter()
             .map(|&(_, left)| left)
-            .max_by(|x, y| x.partial_cmp(y).unwrap())
+            .max_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Less))
             .unwrap_or(7.) as f64;
     let x_max = (words_len as f64).log2() + 1.;
 

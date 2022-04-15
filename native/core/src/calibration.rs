@@ -59,6 +59,8 @@ pub enum FitError {
     ProblemBuildUnsuccessful,
     #[error("Unable to fit")]
     FitUnsuccessful,
+    #[error("no fit result")]
+    NoFitResults,
 }
 
 pub fn fit(data: Vec<(f64, f64)>, weights: Vec<f64>) -> Result<Calibration, FitError> {
@@ -87,7 +89,9 @@ pub fn fit(data: Vec<(f64, f64)>, weights: Vec<f64>) -> Result<Calibration, FitE
     }
 
     let alpha = solved_problem.params();
-    let c = solved_problem.linear_coefficients().unwrap();
+    let c = solved_problem
+        .linear_coefficients()
+        .ok_or(FitError::NoFitResults)?;
 
     Ok(Calibration {
         c: c[0],

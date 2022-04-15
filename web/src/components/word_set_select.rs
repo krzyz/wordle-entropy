@@ -1,7 +1,5 @@
-use crate::word_set::{WordSet, WordSetVec, WordSetVecAction};
-use crate::WORD_SIZE;
-use bounce::{use_atom, use_atom_setter, use_slice, Atom};
-use reqwest::StatusCode;
+use anyhow::{anyhow, Result};
+use bounce::{use_atom, use_atom_setter, use_slice, Atom, UseSliceHandle};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
 use wordle_entropy_core::data::parse_words;
@@ -9,6 +7,31 @@ use yew::events::Event;
 use yew::{function_component, html, use_effect, Callback, Html, TargetCast};
 
 use super::toast::{ToastOption, ToastType};
+use crate::word_set::{WordSet, WordSetVec, WordSetVecAction};
+use crate::WORD_SIZE;
+
+async fn handle_word_set_init(word_sets: UseSliceHandle<WordSetVec>) -> Result<()> {
+    let client = reqwest::Client::new();
+    let response = client
+        .get("https://wordle.realcomplexity.com/data/words-scrabble-with_probs.csv")
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        return Err(anyhow!(
+            "Error loading default word sets, request status: {}",
+            response.status()
+        ));
+    }
+
+    let text = response.text().await?;
+    let dictionary = parse_words::<_, WORD_SIZE>(text.lines())?;
+    word_sets.dispatch(WordSetVecAction::Set((*word_sets).extend_with(
+        WordSet::from_dictionary("Polish words scrabble".to_string(), dictionary),
+    )));
+
+    Ok(())
+}
 
 #[derive(Default, PartialEq, Atom)]
 pub struct WordSetSelection(pub Option<String>);
@@ -25,32 +48,12 @@ pub fn word_set_select() -> Html {
         use_effect(move || {
             if word_sets.0.len() == 0 {
                 spawn_local(async move {
-                    let client = reqwest::Client::new();
-                    let response = client
-                        .get("https://wordle.realcomplexity.com/data/words-scrabble-with_probs.csv")
-                        .send()
-                        .await
-                        .unwrap();
-
-                    match response.status() {
-                        StatusCode::OK => {
-                            let text = response.text().await.unwrap();
-                            let dictionary = parse_words::<_, WORD_SIZE>(text.lines());
-                            word_sets.dispatch(WordSetVecAction::Set((*word_sets).extend_with(
-                                WordSet::from_dictionary(
-                                    "Polish words scrabble".to_string(),
-                                    dictionary.unwrap(),
-                                ),
-                            )));
-                            set_toast(ToastOption::new(
-                                "Loaded from url".to_string(),
-                                ToastType::Success,
-                            ));
-                        }
-                        _ => set_toast(ToastOption::new(
-                            "Error loading csv".to_string(),
+                    let result = handle_word_set_init(word_sets).await;
+                    if let Err(err) = result {
+                        set_toast(ToastOption::new(
+                            format!("{err}").to_string(),
                             ToastType::Error,
-                        )),
+                        ))
                     }
                 });
             } else {
@@ -68,9 +71,13 @@ pub fn word_set_select() -> Html {
     };
 
     if word_sets.0.len() > 0 && *selected == WordSetSelection(None) {
-        selected.set(WordSetSelection(Some(
-            word_sets.0.iter().next().unwrap().name.clone(),
-        )));
+        match word_sets.0.iter().next() {
+            Some(word_set) => selected.set(WordSetSelection(Some(word_set.name.clone()))),
+            None => set_toast(ToastOption::new(
+                "No word sets available".to_string(),
+                ToastType::Error,
+            )),
+        }
     }
 
     html! {

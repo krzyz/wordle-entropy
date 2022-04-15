@@ -1,15 +1,20 @@
+use std::cmp::Ordering::Equal;
+
+use anyhow::{anyhow, Result};
+use bounce::use_atom_setter;
 use gloo_events::EventListener;
 use plotters::prelude::*;
 use plotters_canvas::CanvasBackend;
-use std::cmp::Ordering::Equal;
 use web_sys::HtmlCanvasElement;
 use yew::{
     functional::function_component, html, use_effect, use_node_ref, use_state_eq, Properties,
 };
 
-fn draw_plot(canvas: HtmlCanvasElement, data: &[f64]) -> Result<(), Box<dyn std::error::Error>> {
+use super::toast::{ToastOption, ToastType};
+
+fn draw_plot(canvas: HtmlCanvasElement, data: &[f64]) -> Result<()> {
     let root = CanvasBackend::with_canvas_object(canvas)
-        .unwrap()
+        .ok_or(anyhow!("Unable to initialize plot backend from canvas"))?
         .into_drawing_area();
 
     let mut data = data.iter().copied().collect::<Vec<_>>();
@@ -57,14 +62,14 @@ pub fn view(props: &Props) -> Html {
     let canvas_node_ref = use_node_ref();
     let data = props.data.clone();
     let canvas_size = use_state_eq(|| (700., 400.));
+    let set_toast = use_atom_setter::<ToastOption>();
 
     {
         let canvas_node_ref = canvas_node_ref.clone();
         let canvas_size = canvas_size.clone();
+        let set_toast = set_toast.clone();
 
         use_effect(move || {
-            log::info!("register_event_listener");
-
             let listener = {
                 let canvas_node_ref = canvas_node_ref.clone();
                 let canvas_size = canvas_size.clone();
@@ -78,7 +83,13 @@ pub fn view(props: &Props) -> Html {
             let canvas = canvas_node_ref.cast::<HtmlCanvasElement>().unwrap();
             let dom_rect = canvas.get_bounding_client_rect();
             canvas_size.set((dom_rect.width(), dom_rect.height()));
-            draw_plot(canvas, &data[..]).unwrap();
+            match draw_plot(canvas, &data[..]) {
+                Ok(_) => (),
+                Err(err) => set_toast(ToastOption::new(
+                    format!("Worker error: {err}").to_string(),
+                    ToastType::Error,
+                )),
+            }
 
             move || drop(listener)
         });
