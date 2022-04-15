@@ -68,11 +68,6 @@ pub fn word_set_select() -> Html {
     };
 
     if word_sets.0.len() > 0 && *selected == WordSetSelection(None) {
-        set_toast(ToastOption::new(
-            "Empty Word Set".to_string(),
-            ToastType::Warning,
-        ));
-
         selected.set(WordSetSelection(Some(
             word_sets.0.iter().next().unwrap().name.clone(),
         )));
