@@ -12,7 +12,8 @@ use yew::{
 use crate::components::hinted_word::HintedWord;
 use crate::components::select_words::{SelectWords, SelectedWords};
 use crate::components::toast::{ToastOption, ToastType};
-use crate::components::turns_plot::TurnsPlot;
+use crate::components::Plot;
+use crate::plots::TurnsLeftPlotter;
 use crate::simulation::{SimulationInput, SimulationOutput};
 use crate::word_set::{get_current_word_set, WordSet};
 use crate::worker::{WordleWorkerInput, WordleWorkerOutput};
@@ -361,8 +362,9 @@ pub fn view() -> Html {
     };
 
     let data = simulation_state.turns_data.clone();
-    let words_len = word_set.dictionary.words.len();
     let running = !simulation_state.words_left.is_empty();
+    let plot_title = format!("Expected turns: {}", simulation_state.expected_turns);
+    let plotter = TurnsLeftPlotter { title: plot_title };
 
     html! {
         <section>
@@ -370,7 +372,6 @@ pub fn view() -> Html {
             <button
                 class="btn btn-primary"
                 onclick={on_start_button_click}
-                disabled={words_len > 0}
             >{ "Start" }</button>
             <button
                 class="btn btn-primary"
@@ -384,7 +385,7 @@ pub fn view() -> Html {
             >{ "Step" }</button>
             <div class="columns">
                 <div class="column col-8 col-xl-12">
-                    <TurnsPlot {data} {words_len} title={format!("Expected turns: {}", simulation_state.expected_turns)} />
+                    <Plot<(f64, f64, f64), TurnsLeftPlotter> {data} {plotter} />
                 </div>
                 <div class="column col-3 col-xl-9">
                     <ul class="words_left_list">

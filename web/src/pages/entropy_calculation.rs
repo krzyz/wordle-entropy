@@ -8,8 +8,9 @@ use yew::{
 };
 use yew::{use_reducer, MouseEvent};
 
-use crate::components::entropy_plot::EntropyPlot;
 use crate::components::toast::{ToastOption, ToastType};
+use crate::components::Plot;
+use crate::plots::EntropiesPlotter;
 use crate::word_set::get_current_word_set;
 use crate::word_set::{WordSetVec, WordSetVecAction};
 use crate::worker::{WordleWorkerInput, WordleWorkerOutput};
@@ -217,7 +218,7 @@ pub fn view() -> Html {
             </div>
             <div class="columns">
                 <div class="column col-8 col-xl-12">
-                    <EntropyPlot {data} />
+                    <Plot<f64, EntropiesPlotter> {data} plotter={EntropiesPlotter{}} />
                 </div>
                 <div class="column col-4 col-xl-12">
                     <label for="max_words_shown_input">{"Max words shown:"}</label>

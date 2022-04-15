@@ -4,6 +4,7 @@
 mod components;
 pub mod main_app;
 mod pages;
+mod plots;
 mod simulation;
 mod word_set;
 mod worker;
