@@ -1,12 +1,16 @@
 use std::collections::VecDeque;
 use std::rc::Rc;
+use std::str::FromStr;
 
 use bounce::use_atom_setter;
 use rand::{seq::IteratorRandom, seq::SliceRandom, thread_rng};
 use serde_cbor::ser::to_vec_packed;
+use strum::IntoEnumIterator;
+use strum_macros::{Display, EnumIter, EnumString};
+use web_sys::HtmlElement;
 use yew::{
-    function_component, html, use_effect_with_deps, use_mut_ref, use_reducer, use_state, Callback,
-    Html, Reducible,
+    classes, function_component, html, use_effect_with_deps, use_mut_ref, use_reducer, use_state,
+    use_state_eq, Callback, Html, MouseEvent, Reducible, TargetCast,
 };
 
 use crate::components::hinted_word::HintedWord;
@@ -176,6 +180,13 @@ impl Reducible for SimulationState {
     }
 }
 
+#[derive(PartialEq, EnumIter, Display, EnumString)]
+pub enum Tab {
+    History,
+    Detail,
+    Calibration,
+}
+
 #[function_component(Simulation)]
 pub fn view() -> Html {
     let word_set = Rc::new(get_current_word_set());
@@ -187,6 +198,8 @@ pub fn view() -> Html {
     let send_queue = use_mut_ref(|| -> Option<SimulationInput> { None });
     let words_left = use_mut_ref(|| -> Vec<Word> { vec![] });
     let set_toast = use_atom_setter::<ToastOption>();
+    let active_tab = use_state_eq(|| Tab::History);
+    let all_words = use_mut_ref(|| -> Vec<Word> { vec![] });
 
     *words_left.borrow_mut() = simulation_state.words_left.clone();
 
@@ -302,6 +315,7 @@ pub fn view() -> Html {
         let selected_words = selected_words.clone();
         let simulation_state = simulation_state.clone();
         let word_set = word_set.clone();
+        let all_words = all_words.clone();
 
         Callback::from(move |_| {
             *stepping.borrow_mut() = false;
@@ -319,6 +333,8 @@ pub fn view() -> Html {
                 }
                 SelectedWords::Custom(ref words) => words.clone(),
             };
+
+            *all_words.borrow_mut() = words.clone();
 
             if words.len() > 0 {
                 let word = words.remove(0);
@@ -361,10 +377,28 @@ pub fn view() -> Html {
         })
     };
 
+    let on_tab_change = {
+        let active_tab = active_tab.clone();
+        Callback::from(move |e: MouseEvent| {
+            let element: HtmlElement = e.target_unchecked_into();
+            if let Some(tab) = element.dataset().get("tab") {
+                active_tab.set(Tab::from_str(tab.as_str()).unwrap())
+            }
+        })
+    };
+
     let data = simulation_state.turns_data.clone();
     let running = !simulation_state.words_left.is_empty();
     let plot_title = format!("Expected turns: {}", simulation_state.expected_turns);
     let plotter = TurnsLeftPlotter { title: plot_title };
+    let all_words_len = all_words.borrow().len();
+    let progress_value = all_words_len
+        - words_left.borrow().len()
+        - if let Some(_) = simulation_state.current_word {
+            1
+        } else {
+            0
+        };
 
     html! {
         <section>
@@ -383,63 +417,62 @@ pub fn view() -> Html {
                 onclick={on_step_button_click}
                 disabled={!running}
             >{ "Step" }</button>
-            <div class="columns">
-                <div class="column col-8 col-xl-12">
-                    <Plot<(f64, f64, f64), TurnsLeftPlotter> {data} {plotter} />
-                </div>
-                <div class="column col-3 col-xl-9">
-                    <ul class="words_left_list">
-                        {
-                            simulation_state.last_scores.iter().map(|&(word, score, could_be_answer)| {
-                                let word = &word_set.dictionary.words[word];
-                                html! {
-                                    <li> { format!("{word}: {score} | {could_be_answer:#?}")} </li>
-                                }
-                            }).collect::<Html>()
+            <progress class="progress" value={progress_value.to_string()} max={all_words_len.to_string()}/>
+            <ul class="tab tab-block" onclick={on_tab_change}>
+                {
+                    Tab::iter().map(|tab| {
+                        html! {
+                            <li class={classes!("tab-item", (tab == *active_tab).then(|| "active"))}>
+                                <a href={format!("#{tab}")} data-tab={tab.to_string()}>{ tab.to_string() }</a>
+                            </li>
                         }
-                    </ul>
-                </div>
-                <div class="column col-1 col-xl-3">
-                    <div>
-                        if let Some(ref word) = simulation_state.current_word {
-                            <p> { word } </p>
-                        }
-                        <p> { "Left:" } </p>
+                    }).collect::<Html>()
+                }
+            </ul>
+            {
+                match *active_tab {
+                    Tab::History => html! {
+                        <div>
+                            {
+                                simulation_state.history.iter().map(|row| {
+                                    html! {
+                                        <p>
+                                            {
+                                                row.iter().map(|(word, hints, _)| {
+                                                    let word = word_set.dictionary.words[*word].clone();
+                                                    let hints = hints.clone();
+                                                    html! {
+                                                        <>
+                                                            <HintedWord {word} {hints} />
+                                                            <div style="display: inline" class="m-2" />
+                                                            <div style="display: inline" class="m-2" />
+                                                        </>
+                                                    }
+                                                }).collect::<Html>()
+                                            }
+                                        </p>
+                                    }
+                                }).collect::<Html>()
+                            }
+                        </div>
+                    },
+                    Tab::Detail => html! {
                         <ul class="words_left_list">
                             {
-                                simulation_state.words_left.iter().map(|word| {
+                                simulation_state.last_scores.iter().map(|&(word, score, could_be_answer)| {
+                                    let word = &word_set.dictionary.words[word];
                                     html! {
-                                        <li> { word } </li>
+                                        <li> { format!("{word}: {score} | {could_be_answer:#?}")} </li>
                                     }
                                 }).collect::<Html>()
                             }
                         </ul>
-                    </div>
-                </div>
-            </div>
-            <div>
-                {
-                    simulation_state.history.iter().map(|row| {
-                        html! {
-                            <p>
-                                {
-                                    row.iter().map(|(word, hints, _)| {
-                                        let word = word_set.dictionary.words[*word].clone();
-                                        let hints = hints.clone();
-                                        html! {
-                                            <>
-                                                <HintedWord {word} {hints} />
-                                                <div style="display: inline" class="m-2" />
-                                                <div style="display: inline" class="m-2" />
-                                            </>
-                                        }
-                                    }).collect::<Html>()
-                                }
-                            </p>
-                        }
-                    }).collect::<Html>()
+                    },
+                    Tab::Calibration => html! {
+                        <Plot<(f64, f64, f64), TurnsLeftPlotter> {data} {plotter} />
+                    },
                 }
-            </div>
-        </section>
+            }
+       </section>
     }
 }
