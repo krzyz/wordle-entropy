@@ -21,14 +21,14 @@ use crate::simulation::{SimulationInput, SimulationOutput};
 use crate::word_set::{get_current_word_set, WordSet};
 use crate::worker::{WordleWorkerInput, WordleWorkerOutput};
 use crate::worker_atom::WordleWorkerAtom;
-use crate::{EntropiesData, Hints, Word};
+use crate::{EntropiesData, Hints};
 
 enum SimulationStateAction {
-    Initialize(Word, Vec<Word>, Rc<WordSet>),
+    Initialize(usize, Vec<usize>, Rc<WordSet>),
     NextStep {
-        next_word: Option<Word>,
+        next_word: Option<usize>,
         guess: usize,
-        hints: Hints,
+        hints: usize,
         uncertainty: f64,
         scores: Vec<(usize, EntropiesData, f64)>,
         answers: Vec<usize>,
@@ -39,13 +39,13 @@ enum SimulationStateAction {
 struct SimulationState {
     current_turns: Vec<(f64, f64)>,
     turns_data: Vec<(f64, f64, f64)>,
-    current_word: Option<Word>,
-    last_hints: Option<Hints>,
+    current_word: Option<usize>,
+    last_hints: Option<usize>,
     last_guess: Option<usize>,
     last_scores: Vec<(usize, f64, bool)>,
-    history: VecDeque<Vec<(usize, Hints, f64)>>,
+    history: VecDeque<Vec<(usize, usize, f64)>>,
     history_small: Vec<(usize, usize)>,
-    words_left: Vec<Word>,
+    words_left: Vec<usize>,
     word_set: Option<Rc<WordSet>>,
 }
 
@@ -85,7 +85,7 @@ impl Reducible for SimulationState {
                     .map(|(word, _, score)| (word, score, answers.contains(&word)))
                     .collect();
 
-                let mut last_optn: Option<&mut Vec<(usize, Hints, f64)>>;
+                let mut last_optn: Option<&mut Vec<(usize, usize, f64)>>;
                 let history_front = if let Some(history_front) = history.front_mut() {
                     history_front
                 } else {
@@ -102,7 +102,7 @@ impl Reducible for SimulationState {
 
                     let answer = answers[0];
                     if answer != guess {
-                        history_front.push((answer, Hints::correct(), 0.));
+                        history_front.push((answer, Hints::correct().to_ind(), 0.));
                     }
                     if words_left.len() > 0 {
                         words_left.remove(0);
@@ -168,10 +168,10 @@ pub fn view() -> Html {
     let stepping = use_mut_ref(|| false);
     let next_step = use_state(|| false);
     let send_queue = use_mut_ref(|| -> Option<SimulationInput> { None });
-    let words_left = use_mut_ref(|| -> Vec<Word> { vec![] });
+    let words_left = use_mut_ref(|| -> Vec<usize> { vec![] });
     let set_toast = use_atom_setter::<ToastOption>();
     let active_tab = use_state_eq(|| Tab::History);
-    let all_words = use_mut_ref(|| -> Vec<Word> { vec![] });
+    let all_words = use_mut_ref(|| -> Vec<usize> { vec![] });
 
     *words_left.borrow_mut() = simulation_state.words_left.clone();
 
@@ -294,12 +294,8 @@ pub fn view() -> Html {
             let mut words = match *selected_words.borrow() {
                 SelectedWords::Random(n) => {
                     let mut rng = thread_rng();
-                    let mut words_selected = word_set
-                        .dictionary
-                        .words
-                        .iter()
-                        .cloned()
-                        .choose_multiple(&mut rng, n);
+                    let mut words_selected =
+                        (0..word_set.dictionary.words.len()).choose_multiple(&mut rng, n);
                     words_selected.shuffle(&mut rng);
                     words_selected
                 }

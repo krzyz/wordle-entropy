@@ -7,11 +7,11 @@ use wordle_entropy_core::{
     entropy::{calculate_entropies, entropies_scored},
 };
 
-use crate::{word_set::WordSet, EntropiesData, Hints, Knowledge, Word};
+use crate::{word_set::WordSet, EntropiesData, Knowledge};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum SimulationInput {
-    Start(Word, Option<usize>),
+    Start(usize, Option<usize>),
     Continue(Option<usize>),
     Stop,
 }
@@ -20,7 +20,7 @@ pub enum SimulationInput {
 pub enum SimulationOutput {
     StepComplete {
         guess: usize,
-        hints: Hints,
+        hints: usize,
         uncertainty: f64,
         scores: Vec<(usize, EntropiesData, f64)>,
         answers: Vec<usize>,
@@ -30,14 +30,14 @@ pub enum SimulationOutput {
 
 pub struct SimulationData {
     word_set: Rc<WordSet>,
-    correct: Word,
+    correct: usize,
     knowledge: Knowledge,
     entropies: Rc<Vec<(usize, EntropiesData, f64)>>,
     answers: Vec<usize>,
 }
 
 impl SimulationData {
-    fn new(word_set: &Rc<WordSet>, solution: Word) -> Result<Self> {
+    fn new(word_set: &Rc<WordSet>, solution: usize) -> Result<Self> {
         let entropies = word_set
             .entropies
             .as_ref()
@@ -77,7 +77,7 @@ impl Simulation {
     pub fn handle_start(
         &mut self,
         word_set: &Rc<WordSet>,
-        correct: Word,
+        correct: usize,
         guess: Option<usize>,
     ) -> Result<SimulationOutput> {
         self.state = Some(SimulationData::new(word_set, correct)?);
@@ -101,9 +101,10 @@ impl Simulation {
             }
         };
 
-        let guess_word = data.word_set.dictionary.words[guess].clone();
-        let (hints, knowledge) =
-            get_hints_and_update(&guess_word, &data.correct, data.knowledge.clone());
+        let guess_word = &data.word_set.dictionary.words[guess];
+        let correct = &data.word_set.dictionary.words[data.correct];
+        let (hints, knowledge) = get_hints_and_update(guess_word, correct, data.knowledge.clone());
+        let hints = hints.to_ind();
 
         data.answers = get_answers(data.word_set.dictionary.words.clone(), &knowledge);
         data.knowledge = knowledge;

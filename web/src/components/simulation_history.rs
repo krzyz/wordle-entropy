@@ -4,11 +4,11 @@ use web_sys::HtmlInputElement;
 use yew::{function_component, html, use_state_eq, Callback, Event, Html, Properties, TargetCast};
 
 use crate::components::{HintedWord, Plot};
-use crate::{plots::ExpectedTurnsPlotter, word_set::WordSet, Hints};
+use crate::{plots::ExpectedTurnsPlotter, word_set::WordSet};
 
 #[derive(Properties, PartialEq)]
 pub struct Props {
-    pub history: VecDeque<Vec<(usize, Hints, f64)>>,
+    pub history: VecDeque<Vec<(usize, usize, f64)>>,
     pub history_small: Vec<(usize, usize)>,
     pub word_set: Rc<WordSet>,
 }
@@ -56,7 +56,7 @@ pub fn view(props: &Props) -> Html {
                             {
                                 row.iter().map(|(word, hints, _)| {
                                     let word = props.word_set.dictionary.words[*word].clone();
-                                    let hints = hints.clone();
+                                    let hints = props.word_set.dictionary.hints[*hints].clone();
                                     html! {
                                         <>
                                             <HintedWord {word} {hints} />

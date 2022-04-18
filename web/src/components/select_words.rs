@@ -8,15 +8,15 @@ use yew::{
     TargetCast,
 };
 
-use crate::{Dictionary, Word};
+use crate::Dictionary;
 
 #[derive(Clone, Debug)]
 pub enum SelectedWords {
     Random(usize),
-    Custom(Vec<Word>),
+    Custom(Vec<usize>),
 }
 
-fn parse_custom_words(words_str: &str, dictionary: &Dictionary) -> Result<Vec<Word>> {
+fn parse_custom_words(words_str: &str, dictionary: &Dictionary) -> Result<Vec<usize>> {
     let words: Vec<_> = words_str
         .split(",")
         .map(|word| word.try_into().map_err(|e: WordError| e.into()))
@@ -24,9 +24,12 @@ fn parse_custom_words(words_str: &str, dictionary: &Dictionary) -> Result<Vec<Wo
 
     let mut words_unchecked = words.iter().collect::<HashSet<_>>();
 
-    for word in dictionary.words.iter() {
+    let mut words_inds = vec![];
+
+    for (i, word) in dictionary.words.iter().enumerate() {
         if words_unchecked.contains(word) {
             words_unchecked.remove(word);
+            words_inds.push(i);
         }
     }
 
@@ -41,7 +44,7 @@ fn parse_custom_words(words_str: &str, dictionary: &Dictionary) -> Result<Vec<Wo
         ));
     }
 
-    Ok(words)
+    Ok(words_inds)
 }
 
 #[derive(Properties, PartialEq)]
@@ -53,7 +56,7 @@ pub struct Props {
 #[function_component(SelectWords)]
 pub fn view(props: &Props) -> Html {
     let num_random = use_mut_ref(|| 10);
-    let custom_words = use_mut_ref(|| -> Vec<Word> { vec![] });
+    let custom_words = use_mut_ref(|| -> Vec<usize> { vec![] });
     let num_random_err = use_state(|| -> Option<Error> { None });
     let custom_words_err = use_state(|| -> Option<Error> { None });
     let selected = use_mut_ref(|| SelectedWords::Random(*num_random.borrow()));
