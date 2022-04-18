@@ -17,7 +17,7 @@ use crate::components::hinted_word::HintedWord;
 use crate::components::select_words::{SelectWords, SelectedWords};
 use crate::components::toast::{ToastOption, ToastType};
 use crate::components::Plot;
-use crate::plots::TurnsLeftPlotter;
+use crate::plots::{ExpectedTurnsPlotter, TurnsLeftPlotter};
 use crate::simulation::{SimulationInput, SimulationOutput};
 use crate::word_set::{get_current_word_set, WordSet};
 use crate::worker::{WordleWorkerInput, WordleWorkerOutput};
@@ -390,7 +390,6 @@ pub fn view() -> Html {
     let data = simulation_state.turns_data.clone();
     let running = !simulation_state.words_left.is_empty();
     let plot_title = format!("Expected turns: {}", simulation_state.expected_turns);
-    let plotter = TurnsLeftPlotter { title: plot_title };
     let all_words_len = all_words.borrow().len();
     let progress_value = all_words_len
         - words_left.borrow().len()
@@ -399,6 +398,8 @@ pub fn view() -> Html {
         } else {
             0
         };
+
+    let plotter = TurnsLeftPlotter { title: plot_title };
 
     html! {
         <section>
@@ -432,28 +433,43 @@ pub fn view() -> Html {
             {
                 match *active_tab {
                     Tab::History => html! {
-                        <div>
-                            {
-                                simulation_state.history.iter().map(|row| {
-                                    html! {
-                                        <p>
-                                            {
-                                                row.iter().map(|(word, hints, _)| {
-                                                    let word = word_set.dictionary.words[*word].clone();
-                                                    let hints = hints.clone();
-                                                    html! {
-                                                        <>
-                                                            <HintedWord {word} {hints} />
-                                                            <div style="display: inline" class="m-2" />
-                                                            <div style="display: inline" class="m-2" />
-                                                        </>
-                                                    }
-                                                }).collect::<Html>()
-                                            }
-                                        </p>
-                                    }
-                                }).collect::<Html>()
-                            }
+                        <div class="container">
+                            <div class="columns">
+                                <div class="column col-6">
+                                    {{
+                                        let data = simulation_state
+                                            .history_small
+                                            .iter()
+                                            .map(|&(turns, word)| (turns, word_set.dictionary.probabilities[word]))
+                                            .collect::<Vec<_>>();
+                                        let plotter = ExpectedTurnsPlotter { weighted: true };
+                                        html! { <Plot<(usize, f64), ExpectedTurnsPlotter> {data} {plotter} />}
+                                    }}
+                                </div>
+                                <div class="column col-6">
+                                {
+                                    simulation_state.history.iter().map(|row| {
+                                        html! {
+                                            <p>
+                                                {
+                                                    row.iter().map(|(word, hints, _)| {
+                                                        let word = word_set.dictionary.words[*word].clone();
+                                                        let hints = hints.clone();
+                                                        html! {
+                                                            <>
+                                                                <HintedWord {word} {hints} />
+                                                                <div style="display: inline" class="m-2" />
+                                                                <div style="display: inline" class="m-2" />
+                                                            </>
+                                                        }
+                                                    }).collect::<Html>()
+                                                }
+                                            </p>
+                                        }
+                                    }).collect::<Html>()
+                                }
+                                </div>
+                            </div >
                         </div>
                     },
                     Tab::Detail => html! {

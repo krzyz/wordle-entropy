@@ -42,7 +42,7 @@ impl Plotter for TurnsLeftPlotter {
                 .iter()
                 .map(|&(entropy, _)| entropy)
                 .max_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Less))
-                .unwrap_or(8.) as f64;
+                .unwrap_or(5.) as f64;
 
         let x_max_i = x_max.ceil() as i32;
 
@@ -117,42 +117,52 @@ impl Plotter for TurnsLeftPlotter {
         let axis_val_multiplier = 5.;
         if fit_data.len() >= 4 {
             let calibration = fit(fit_data, weights).map_err(|e| anyhow!("{e}"))?;
-            let Calibration { c, a0, a1 } = calibration;
+            let color = &RED;
             chart
                 .draw_series(LineSeries::new(
                     (0..=((axis_val_multiplier * x_max.floor()) as i32))
                         .map(|x| (x as f64) / axis_val_multiplier)
                         .map(|x| (x, bounded_log_c(x, calibration))),
-                    &RED,
+                    color,
                 ))?
-                .label(format!("{c:.3} ln({a0:.3} (x + {a1:.3}))"))
-                .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &RED));
+                .label(format!("Fitted calibration"))
+                .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], color));
         }
 
         {
-            chart.draw_series(LineSeries::new(
-                (0..=((axis_val_multiplier * x_max.floor()) as i32))
-                    .map(|x| (x as f64) / axis_val_multiplier)
-                    .map(|x| (x, bounded_log_c(x, Calibration::default()))),
-                &BLUE,
-            ))?;
+            let color = &BLUE;
+            chart
+                .draw_series(LineSeries::new(
+                    (0..=((axis_val_multiplier * x_max.floor()) as i32))
+                        .map(|x| (x as f64) / axis_val_multiplier)
+                        .map(|x| (x, bounded_log_c(x, Calibration::default()))),
+                    color,
+                ))?
+                .label(format!("Used calibration"))
+                .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], color));
         }
 
-        chart.draw_series(PointSeries::of_element(
-            data_with_weights.iter().copied(),
-            2,
-            &BLACK,
-            &|(c1, c2, prob), s: i32, st| {
-                return Circle::new((c1, c2), s, {
-                    let mut st = st.filled();
-                    st.color = BLACK.mix(prob);
-                    st
-                });
-            },
-        ))?;
+        let circle_size = 2;
+        let circle_color = &BLACK;
+        chart
+            .draw_series(PointSeries::of_element(
+                data_with_weights.iter().copied(),
+                circle_size,
+                circle_color,
+                &|(c1, c2, prob), s: i32, st| {
+                    return Circle::new((c1, c2), s, {
+                        let mut st = st.filled();
+                        st.color = BLACK.mix(prob);
+                        st
+                    });
+                },
+            ))?
+            .label(format!("Known data points"))
+            .legend(move |(x, y)| Circle::new((x, y), circle_size, circle_color));
 
         chart
             .configure_series_labels()
+            .position(SeriesLabelPosition::UpperLeft)
             .background_style(&WHITE.mix(0.8))
             .border_style(&BLACK)
             .draw()?;
