@@ -4,12 +4,10 @@ use plotters_canvas::CanvasBackend;
 use web_sys::HtmlCanvasElement;
 use wordle_entropy_core::calibration::{bounded_log_c, fit, Calibration};
 
-use crate::components::plot::Plotter;
+use crate::components::Plotter;
 
 #[derive(Clone, PartialEq)]
-pub struct TurnsLeftPlotter {
-    pub title: String,
-}
+pub struct TurnsLeftPlotter;
 
 impl Plotter for TurnsLeftPlotter {
     type DataType = (f64, f64, f64);
@@ -87,7 +85,6 @@ impl Plotter for TurnsLeftPlotter {
         let root = root.margin(10u32, 10u32, 10u32, 10u32);
         let mut chart = ChartBuilder::on(&root)
             .margin(5u32)
-            .caption(self.title.as_str(), ("sans-serif", 30.0).into_font())
             .x_label_area_size(30u32)
             .y_label_area_size(30u32)
             .build_cartesian_2d(0f64..x_max, 0f64..y_max)?

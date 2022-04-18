@@ -4,7 +4,7 @@ use plotters_canvas::CanvasBackend;
 use web_sys::HtmlCanvasElement;
 use wordle_entropy_core::FxHashMap;
 
-use crate::components::plot::Plotter;
+use crate::components::Plotter;
 
 #[derive(Clone, PartialEq)]
 pub struct ExpectedTurnsPlotter {
@@ -25,6 +25,19 @@ impl Plotter for ExpectedTurnsPlotter {
             *counts.entry(turns_left).or_insert(0.) += to_add;
         }
         let bars = counts.into_iter().collect::<Vec<_>>();
+        let expected_turns = if data.len() > 0 {
+            let prob_norm: f64 = data.iter().map(|&(_, prob)| prob).sum();
+            let turns_times_probs = data.into_iter().fold(0., |old, &(turns_left, prob)| {
+                old + (turns_left as f64) * prob
+            });
+            if prob_norm > 0. {
+                Some(turns_times_probs / prob_norm)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
 
         root.fill(&WHITE)?;
 
@@ -37,9 +50,15 @@ impl Plotter for ExpectedTurnsPlotter {
                 .fold(f64::NEG_INFINITY, f64::max);
         let y_max = if bars.len() > 0 { y_max + 0.02 } else { 1.0 };
 
+        let title = if let Some(expected_turns) = expected_turns {
+            format!("Expected turns: {expected_turns:.3}")
+        } else {
+            "Expected turns: Unavailable".to_string()
+        };
         let mut chart = ChartBuilder::on(&root)
             .x_label_area_size(35u32)
             .y_label_area_size(60u32)
+            .caption(title.as_str(), ("sans-serif", 30.0).into_font())
             .margin(8u32)
             .build_cartesian_2d((0..x_max).into_segmented(), 0.0..y_max)?;
 

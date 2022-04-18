@@ -1,8 +1,5 @@
-use crate::components::{toast::ToastComponent, word_set_select::WordSetSelect};
-use crate::pages::{
-    entropy_calculation::EntropyCalculation, page_not_found::PageNotFound, simulation::Simulation,
-    solver::Solver, word_sets::WordSets,
-};
+use crate::components::{ToastComponent, WordSetSelect};
+use crate::pages::{EntropyCalculation, PageNotFound, Simulation, Solver, WordSets};
 use bounce::BounceRoot;
 use yew::{function_component, html, Html};
 use yew_router::components::Link;

@@ -1,4 +1,4 @@
-use crate::components::word_set_select::WordSetSelection;
+use crate::components::WordSetSelection;
 use crate::{Dictionary, EntropiesData};
 use bounce::prelude::*;
 use gloo_storage::{LocalStorage, Storage};

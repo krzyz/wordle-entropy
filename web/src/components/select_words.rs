@@ -1,6 +1,5 @@
 use std::{collections::HashSet, rc::Rc};
 
-use crate::{Dictionary, Word};
 use anyhow::{anyhow, Error, Result};
 use web_sys::HtmlInputElement;
 use wordle_entropy_core::structs::WordError;
@@ -8,6 +7,8 @@ use yew::{
     classes, function_component, html, use_mut_ref, use_state, Callback, Event, Properties,
     TargetCast,
 };
+
+use crate::{Dictionary, Word};
 
 #[derive(Clone, Debug)]
 pub enum SelectedWords {

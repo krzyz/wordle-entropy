@@ -5,7 +5,7 @@ use plotters::prelude::*;
 use plotters_canvas::CanvasBackend;
 use web_sys::HtmlCanvasElement;
 
-use crate::components::plot::Plotter;
+use crate::components::Plotter;
 
 #[derive(Clone, PartialEq)]
 pub struct EntropiesPlotter;

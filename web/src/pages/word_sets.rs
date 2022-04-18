@@ -12,7 +12,7 @@ use yew::{function_component, html, use_mut_ref, use_node_ref, Callback, FocusEv
 use yew_router::components::Link;
 
 use crate::{
-    components::toast::{ToastOption, ToastType},
+    components::{ToastOption, ToastType},
     main_app::Route,
     word_set::{WordSetVec, WordSetVecAction},
     WORD_SIZE,

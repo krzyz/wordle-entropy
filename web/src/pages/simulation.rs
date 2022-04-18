@@ -7,43 +7,21 @@ use rand::{seq::IteratorRandom, seq::SliceRandom, thread_rng};
 use serde_cbor::ser::to_vec_packed;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter, EnumString};
-use web_sys::{HtmlElement, HtmlInputElement};
+use web_sys::HtmlElement;
 use yew::{
     classes, function_component, html, use_effect_with_deps, use_mut_ref, use_reducer, use_state,
-    use_state_eq, Callback, Event, Html, MouseEvent, Reducible, TargetCast,
+    use_state_eq, Callback, Html, MouseEvent, Reducible, TargetCast,
 };
 
-use crate::components::hinted_word::HintedWord;
-use crate::components::select_words::{SelectWords, SelectedWords};
-use crate::components::toast::{ToastOption, ToastType};
-use crate::components::Plot;
-use crate::plots::{ExpectedTurnsPlotter, TurnsLeftPlotter};
+use crate::components::{
+    Calibration, SelectWords, SelectedWords, SimulationDetail, SimulationHistory, ToastOption,
+    ToastType,
+};
 use crate::simulation::{SimulationInput, SimulationOutput};
 use crate::word_set::{get_current_word_set, WordSet};
 use crate::worker::{WordleWorkerInput, WordleWorkerOutput};
 use crate::worker_atom::WordleWorkerAtom;
 use crate::{EntropiesData, Hints, Word};
-
-fn get_expected_turns(history_small: &Vec<(usize, usize)>, word_set: &WordSet) -> f64 {
-    let (part_weighted_turns, prob_norm): (Vec<_>, Vec<_>) = history_small
-        .iter()
-        .map(|&(turns, word)| {
-            let probability = word_set.dictionary.probabilities[word];
-            (probability * turns as f64, probability)
-        })
-        .unzip();
-
-    let (part_weighted_turns, prob_norm): (f64, f64) = (
-        part_weighted_turns.into_iter().sum(),
-        prob_norm.into_iter().sum(),
-    );
-
-    if prob_norm != 0. {
-        part_weighted_turns / prob_norm
-    } else {
-        0.
-    }
-}
 
 enum SimulationStateAction {
     Initialize(Word, Vec<Word>, Rc<WordSet>),
@@ -69,7 +47,6 @@ struct SimulationState {
     history_small: Vec<(usize, usize)>,
     words_left: Vec<Word>,
     word_set: Option<Rc<WordSet>>,
-    expected_turns: f64,
 }
 
 impl Reducible for SimulationState {
@@ -88,7 +65,6 @@ impl Reducible for SimulationState {
                 history_small: vec![],
                 words_left,
                 word_set: Some(word_set),
-                expected_turns: 0.,
             }),
             SimulationStateAction::NextStep {
                 next_word,
@@ -103,7 +79,6 @@ impl Reducible for SimulationState {
                 let mut turns_data = self.turns_data.clone();
                 let mut history = self.history.clone();
                 let mut history_small = self.history_small.clone();
-                let mut expected_turns = self.expected_turns;
 
                 let last_scores = scores
                     .into_iter()
@@ -151,8 +126,6 @@ impl Reducible for SimulationState {
                     current_turns = vec![];
 
                     history_small.push((history_front.len(), answer));
-                    expected_turns =
-                        get_expected_turns(&history_small, self.word_set.as_ref().unwrap());
                     if history.len() > 10 {
                         history.pop_back();
                     }
@@ -173,7 +146,6 @@ impl Reducible for SimulationState {
                     history_small,
                     words_left: words_left,
                     word_set: self.word_set.clone(),
-                    expected_turns,
                 })
             }
         }
@@ -388,7 +360,6 @@ pub fn view() -> Html {
     };
 
     let running = !simulation_state.words_left.is_empty();
-    let plot_title = format!("Expected turns: {}", simulation_state.expected_turns);
     let all_words_len = all_words.borrow().len();
     let progress_value = all_words_len
         - words_left.borrow().len()
@@ -397,16 +368,6 @@ pub fn view() -> Html {
         } else {
             0
         };
-
-    let weighted_display = use_state_eq(|| true);
-    let on_checkbox_weighted_change = {
-        let weighted_display = weighted_display.clone();
-
-        Callback::from(move |e: Event| {
-            let input: HtmlInputElement = e.target_unchecked_into();
-            weighted_display.set(input.checked());
-        })
-    };
 
     html! {
         <section>
@@ -440,70 +401,18 @@ pub fn view() -> Html {
             {
                 match *active_tab {
                     Tab::History => html! {
-                        <div class="container">
-                            <div class="columns">
-                                <div class="column col-6">
-                                    <div class="form-group">
-                                        <label class="form-switch">
-                                            <input type="checkbox" onchange={on_checkbox_weighted_change} checked={*weighted_display} />
-                                            <i class="form-icon"></i> { "Display occurencies count weighted by word probabilities"}
-                                        </label>
-                                    </div>
-                                    {{
-                                        let data = simulation_state
-                                            .history_small
-                                            .iter()
-                                            .map(|&(turns, word)| (turns, word_set.dictionary.probabilities[word]))
-                                            .collect::<Vec<_>>();
-                                        let plotter = ExpectedTurnsPlotter { weighted: *weighted_display };
-                                        html! { <Plot<(usize, f64), ExpectedTurnsPlotter> {data} {plotter} />}
-                                    }}
-                                </div>
-                                <div class="column col-6">
-                                {
-                                    simulation_state.history.iter().map(|row| {
-                                        html! {
-                                            <p>
-                                                {
-                                                    row.iter().map(|(word, hints, _)| {
-                                                        let word = word_set.dictionary.words[*word].clone();
-                                                        let hints = hints.clone();
-                                                        html! {
-                                                            <>
-                                                                <HintedWord {word} {hints} />
-                                                                <div style="display: inline" class="m-2" />
-                                                                <div style="display: inline" class="m-2" />
-                                                            </>
-                                                        }
-                                                    }).collect::<Html>()
-                                                }
-                                            </p>
-                                        }
-                                    }).collect::<Html>()
-                                }
-                                </div>
-                            </div >
-                        </div>
+                        <SimulationHistory
+                            history={simulation_state.history.clone()}
+                            history_small={simulation_state.history_small.clone()}
+                            word_set={word_set.clone()}
+                        />
                     },
                     Tab::Detail => html! {
-                        <ul class="words_left_list">
-                            {
-                                simulation_state.last_scores.iter().map(|&(word, score, could_be_answer)| {
-                                    let word = &word_set.dictionary.words[word];
-                                    html! {
-                                        <li> { format!("{word}: {score} | {could_be_answer:#?}")} </li>
-                                    }
-                                }).collect::<Html>()
-                            }
-                        </ul>
+                        <SimulationDetail last_scores={simulation_state.last_scores.clone()} word_set={word_set.clone()} />
                     },
-                    Tab::Calibration => {{
-                        let data = simulation_state.turns_data.clone();
-                        let plotter = TurnsLeftPlotter { title: plot_title };
-                        html! {
-                            <Plot<(f64, f64, f64), TurnsLeftPlotter> {data} {plotter} />
-                        }
-                    }},
+                    Tab::Calibration => html! {
+                        <Calibration data={simulation_state.turns_data.clone()} />
+                    }
                 }
             }
        </section>

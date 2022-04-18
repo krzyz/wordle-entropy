@@ -8,8 +8,7 @@ use yew::{
 };
 use yew::{use_reducer, MouseEvent};
 
-use crate::components::toast::{ToastOption, ToastType};
-use crate::components::Plot;
+use crate::components::{Plot, ToastOption, ToastType};
 use crate::plots::EntropiesPlotter;
 use crate::word_set::get_current_word_set;
 use crate::word_set::{WordSetVec, WordSetVecAction};
