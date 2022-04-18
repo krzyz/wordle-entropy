@@ -1,12 +1,13 @@
 use nalgebra::{DVector, Scalar};
 use num::One;
 use num_traits::Float;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use varpro::model::builder::error::ModelBuildError;
 use varpro::prelude::*;
 use varpro::solvers::levmar::{LevMarProblemBuilder, LevMarSolver};
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Calibration {
     pub c: f64,
     pub a0: f64,

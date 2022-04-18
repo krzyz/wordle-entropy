@@ -4,13 +4,27 @@ use bounce::prelude::*;
 use gloo_storage::{LocalStorage, Storage};
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
+use wordle_entropy_core::calibration::Calibration;
 use yew::Reducible;
+
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum SetCalibration {
+    Default,
+    Custom(Calibration),
+}
+
+impl Default for SetCalibration {
+    fn default() -> Self {
+        Self::Default
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct WordSet {
     pub name: String,
     pub dictionary: Rc<Dictionary>,
     pub entropies: Option<Rc<Vec<(usize, EntropiesData, f64)>>>,
+    pub calibration: SetCalibration,
 }
 
 impl WordSet {
@@ -19,6 +33,7 @@ impl WordSet {
             name,
             dictionary: Rc::new(dictionary),
             entropies: None,
+            calibration: SetCalibration::default(),
         }
     }
 
@@ -27,6 +42,7 @@ impl WordSet {
             name: self.name.clone(),
             dictionary: self.dictionary.clone(),
             entropies: Some(entropies),
+            calibration: self.calibration,
         }
     }
 
@@ -35,6 +51,7 @@ impl WordSet {
             name: self.name.clone(),
             dictionary: self.dictionary.clone(),
             entropies: None,
+            calibration: self.calibration,
         }
     }
 
@@ -46,6 +63,7 @@ impl WordSet {
                 .entropies
                 .as_ref()
                 .map(|e| Rc::new(e.iter().cloned().take(number_to_take).collect())),
+            calibration: self.calibration,
         }
     }
 }
@@ -98,6 +116,7 @@ impl Observed for WordSetVec {
             name: word_set.name.clone(),
             dictionary: word_set.dictionary.clone(),
             entropies: None,
+            calibration: word_set.calibration,
         }) {
             LocalStorage::set(
                 get_word_set_storage_key(&word_set_without_entropies.name),
