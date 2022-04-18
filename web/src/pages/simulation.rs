@@ -7,10 +7,10 @@ use rand::{seq::IteratorRandom, seq::SliceRandom, thread_rng};
 use serde_cbor::ser::to_vec_packed;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter, EnumString};
-use web_sys::HtmlElement;
+use web_sys::{HtmlElement, HtmlInputElement};
 use yew::{
     classes, function_component, html, use_effect_with_deps, use_mut_ref, use_reducer, use_state,
-    use_state_eq, Callback, Html, MouseEvent, Reducible, TargetCast,
+    use_state_eq, Callback, Event, Html, MouseEvent, Reducible, TargetCast,
 };
 
 use crate::components::hinted_word::HintedWord;
@@ -387,7 +387,6 @@ pub fn view() -> Html {
         })
     };
 
-    let data = simulation_state.turns_data.clone();
     let running = !simulation_state.words_left.is_empty();
     let plot_title = format!("Expected turns: {}", simulation_state.expected_turns);
     let all_words_len = all_words.borrow().len();
@@ -399,7 +398,15 @@ pub fn view() -> Html {
             0
         };
 
-    let plotter = TurnsLeftPlotter { title: plot_title };
+    let weighted_display = use_state_eq(|| true);
+    let on_checkbox_weighted_change = {
+        let weighted_display = weighted_display.clone();
+
+        Callback::from(move |e: Event| {
+            let input: HtmlInputElement = e.target_unchecked_into();
+            weighted_display.set(input.checked());
+        })
+    };
 
     html! {
         <section>
@@ -436,13 +443,19 @@ pub fn view() -> Html {
                         <div class="container">
                             <div class="columns">
                                 <div class="column col-6">
+                                    <div class="form-group">
+                                        <label class="form-switch">
+                                            <input type="checkbox" onchange={on_checkbox_weighted_change} checked={*weighted_display} />
+                                            <i class="form-icon"></i> { "Display occurencies count weighted by word probabilities"}
+                                        </label>
+                                    </div>
                                     {{
                                         let data = simulation_state
                                             .history_small
                                             .iter()
                                             .map(|&(turns, word)| (turns, word_set.dictionary.probabilities[word]))
                                             .collect::<Vec<_>>();
-                                        let plotter = ExpectedTurnsPlotter { weighted: true };
+                                        let plotter = ExpectedTurnsPlotter { weighted: *weighted_display };
                                         html! { <Plot<(usize, f64), ExpectedTurnsPlotter> {data} {plotter} />}
                                     }}
                                 </div>
@@ -484,9 +497,13 @@ pub fn view() -> Html {
                             }
                         </ul>
                     },
-                    Tab::Calibration => html! {
-                        <Plot<(f64, f64, f64), TurnsLeftPlotter> {data} {plotter} />
-                    },
+                    Tab::Calibration => {{
+                        let data = simulation_state.turns_data.clone();
+                        let plotter = TurnsLeftPlotter { title: plot_title };
+                        html! {
+                            <Plot<(f64, f64, f64), TurnsLeftPlotter> {data} {plotter} />
+                        }
+                    }},
                 }
             }
        </section>
