@@ -64,7 +64,7 @@ pub enum FitError {
     NoFitResults,
 }
 
-pub fn fit(data: Vec<(f64, f64)>, weights: Vec<f64>) -> Result<Calibration, FitError> {
+pub fn fit(data: Vec<(f64, f64)>, weights: Option<Vec<f64>>) -> Result<Calibration, FitError> {
     let (x, y): (Vec<_>, Vec<_>) = data.into_iter().unzip();
     let Calibration { a0, a1, .. } = Calibration::default();
 
@@ -75,11 +75,13 @@ pub fn fit(data: Vec<(f64, f64)>, weights: Vec<f64>) -> Result<Calibration, FitE
         .build()
         .map_err(FitError::from)?;
 
-    let problem = LevMarProblemBuilder::new()
-        .model(&model)
-        .x(x)
-        .y(y)
-        .weights(weights)
+    let problem = LevMarProblemBuilder::new().model(&model).x(x).y(y);
+    let problem = if let Some(weights) = weights {
+        problem.weights(weights)
+    } else {
+        problem
+    };
+    let problem = problem
         .initial_guess(&[a0, a1])
         .build()
         .map_err(|_| FitError::ProblemBuildUnsuccessful)?;

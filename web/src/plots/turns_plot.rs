@@ -2,12 +2,17 @@ use anyhow::{anyhow, Result};
 use plotters::prelude::*;
 use plotters_canvas::CanvasBackend;
 use web_sys::HtmlCanvasElement;
-use wordle_entropy_core::calibration::{bounded_log_c, fit, Calibration};
+use wordle_entropy_core::calibration::{bounded_log_c, Calibration};
 
 use crate::components::Plotter;
 
 #[derive(Clone, PartialEq)]
-pub struct TurnsLeftPlotter;
+pub struct TurnsLeftPlotter {
+    pub calibration: Option<Calibration>,
+    pub used_calibration: Calibration,
+    pub bar_per_1: i32,
+    pub bar_data: Vec<((f64, f64), f64)>,
+}
 
 impl Plotter for TurnsLeftPlotter {
     type DataType = (f64, f64, f64);
@@ -21,65 +26,21 @@ impl Plotter for TurnsLeftPlotter {
             .ok_or(anyhow!("Unable to initialize plot backend from canvas"))?
             .into_drawing_area();
 
-        let data = data_with_weights
-            .into_iter()
-            .copied()
-            .map(|(c1, c2, _)| (c1, c2))
-            .collect::<Vec<_>>();
-
         let y_max = 1.
-            + data_with_weights
+            + self
+                .bar_data
                 .iter()
-                .filter(|&&(_, _, prob)| prob > 0.2)
-                .map(|&(_, left, _)| left)
+                .filter(|&&((_, _), prob)| prob > 0.2)
+                .map(|&((_, left), _)| left)
                 .max_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Less))
                 .unwrap_or(7.) as f64;
 
-        let x_max = 1.
-            + data
-                .iter()
-                .map(|&(entropy, _)| entropy)
-                .max_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Less))
-                .unwrap_or(5.) as f64;
-
-        let x_max_i = x_max.ceil() as i32;
-
-        let bar_per_1 = 4;
-        let mut bars = (0..(bar_per_1 * x_max_i))
-            .map(|i| {
-                (
-                    (
-                        i as f64 / bar_per_1 as f64,
-                        (i + 1) as f64 / bar_per_1 as f64,
-                    ),
-                    Vec::<(f64, f64)>::new(),
-                )
-            })
-            .collect::<Vec<_>>();
-
-        for &(x, y, prob) in data_with_weights.iter() {
-            if let Some((_, bar_vec)) = bars.get_mut((x * bar_per_1 as f64).floor() as usize) {
-                bar_vec.push((y, prob));
-            }
-        }
-
-        let bars = bars
-            .into_iter()
-            .filter(|(_, bar_vec)| bar_vec.len() > 0)
-            .collect::<Vec<_>>();
-
-        let weights = bars.iter().map(|_| 1.).collect::<Vec<f64>>();
-
-        let bar_data = bars
-            .into_iter()
-            .map(|(x, bar_vec)| {
-                let norm: f64 = bar_vec.iter().map(|&(_, prob)| prob).sum();
-                (
-                    x,
-                    bar_vec.into_iter().map(|(y, prob)| prob * y).sum::<f64>() / norm,
-                )
-            })
-            .collect::<Vec<_>>();
+        let x_max = self
+            .bar_data
+            .iter()
+            .map(|&((x, _), _)| x)
+            .max_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Less))
+            .unwrap_or(5.) as f64;
 
         root.fill(&WHITE)?;
         let root = root.margin(10u32, 10u32, 10u32, 10u32);
@@ -90,7 +51,7 @@ impl Plotter for TurnsLeftPlotter {
             .build_cartesian_2d(0f64..x_max, 0f64..y_max)?
             .set_secondary_coord(
                 (0f64..x_max)
-                    .step(1. / bar_per_1 as f64)
+                    .step(1. / self.bar_per_1 as f64)
                     .use_round()
                     .into_segmented(),
                 0f64..y_max,
@@ -100,24 +61,18 @@ impl Plotter for TurnsLeftPlotter {
 
         chart.configure_secondary_axes().draw()?;
 
-        chart.draw_secondary_series(bar_data.iter().copied().map(|((x0, x1), y)| {
+        chart.draw_secondary_series(self.bar_data.iter().copied().map(|((x0, x1), y)| {
             let x0 = SegmentValue::Exact(x0);
             let x1 = SegmentValue::Exact(x1);
             Rectangle::new([(x0, 0.), (x1, y)], RED.mix(0.2).filled())
         }))?;
 
-        let fit_data = bar_data
-            .into_iter()
-            .map(|((x0, x1), y)| (0.5 * (x0 + x1), y))
-            .collect::<Vec<_>>();
-
         let axis_val_multiplier = 5.;
-        if fit_data.len() >= 4 {
-            let calibration = fit(fit_data, weights).map_err(|e| anyhow!("{e}"))?;
+        if let Some(calibration) = self.calibration {
             let color = &RED;
             chart
                 .draw_series(LineSeries::new(
-                    (0..=((axis_val_multiplier * x_max.floor()) as i32))
+                    (0..=((axis_val_multiplier * x_max.floor()) as i32 + 1))
                         .map(|x| (x as f64) / axis_val_multiplier)
                         .map(|x| (x, bounded_log_c(x, calibration))),
                     color,
@@ -130,9 +85,9 @@ impl Plotter for TurnsLeftPlotter {
             let color = &BLUE;
             chart
                 .draw_series(LineSeries::new(
-                    (0..=((axis_val_multiplier * x_max.floor()) as i32))
+                    (0..=((axis_val_multiplier * x_max.floor()) as i32 + 1))
                         .map(|x| (x as f64) / axis_val_multiplier)
-                        .map(|x| (x, bounded_log_c(x, Calibration::default()))),
+                        .map(|x| (x, bounded_log_c(x, self.used_calibration))),
                     color,
                 ))?
                 .label(format!("Used calibration"))

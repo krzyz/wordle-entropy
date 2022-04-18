@@ -6,15 +6,16 @@ use gloo_file::{
     callbacks::{read_as_text, FileReader},
     FileList, FileReadError,
 };
-use web_sys::HtmlInputElement;
-use wordle_entropy_core::data::parse_words;
-use yew::{function_component, html, use_mut_ref, use_node_ref, Callback, FocusEvent, Html};
-use yew_router::components::Link;
+use web_sys::{HtmlElement, HtmlInputElement};
+use wordle_entropy_core::{calibration::Calibration, data::parse_words};
+use yew::{
+    function_component, html, use_mut_ref, use_node_ref, Callback, FocusEvent, Html, MouseEvent,
+    TargetCast,
+};
 
 use crate::{
     components::{ToastOption, ToastType},
-    main_app::Route,
-    word_set::{WordSetVec, WordSetVecAction},
+    word_set::{SetCalibration, WordSetVec, WordSetVecAction},
     WORD_SIZE,
 };
 
@@ -104,11 +105,28 @@ pub fn form() -> Html {
 #[function_component(WordSets)]
 pub fn view() -> Html {
     let word_sets = use_slice::<WordSetVec>();
+    let dispatch_word_sets = use_slice_dispatch::<WordSetVec>();
 
-    let onclick_remove = |name: String| {
-        let dispatch_word_sets = use_slice_dispatch::<WordSetVec>();
-        Callback::from(move |_| {
-            dispatch_word_sets(WordSetVecAction::Remove(name.to_string()));
+    let onclick_remove = {
+        let dispatch_word_sets = dispatch_word_sets.clone();
+        Callback::from(move |e: MouseEvent| {
+            let element: HtmlElement = e.target_unchecked_into();
+            if let Some(name) = element.dataset().get("name") {
+                dispatch_word_sets(WordSetVecAction::Remove(name));
+            }
+        })
+    };
+
+    let onclick_reset_calibration = {
+        let dispatch_word_sets = dispatch_word_sets.clone();
+        Callback::from(move |e: MouseEvent| {
+            let element: HtmlElement = e.target_unchecked_into();
+            if let Some(name) = element.dataset().get("name") {
+                dispatch_word_sets(WordSetVecAction::SetCalibration(
+                    name,
+                    SetCalibration::Default,
+                ));
+            }
         })
     };
 
@@ -120,9 +138,10 @@ pub fn view() -> Html {
             <table class="table">
                 <thead>
                     <tr>
-                        <th>{"Name"}</th>
-                        <th>{"# of words"}</th>
+                        <th>{ "Name" }</th>
+                        <th>{ "# of words" }</th>
                         <th>{ "Entropies" }</th>
+                        <th>{ "Calibration" }</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -132,24 +151,36 @@ pub fn view() -> Html {
                             let word_set = word_set;
                             let name = word_set.name.clone();
                             html! {
-                                <tr>
+                                <tr key={name.clone()}>
                                     <td> {name.clone()} </td>
                                     <td> {word_set.dictionary.words.len()} </td>
                                     <td> {
                                         if let Some(_) = word_set.entropies {
-                                            html! { <>{"Loaded"}</> }
+                                            html! { <>{ "Available" }</> }
                                         } else {
                                             html! {
                                                 <>
-                                                    <span> {"Unloaded("} </span>
-                                                    <Link<Route> to={Route::EntropyCalculation} >{"Generate"}</Link<Route>>
-                                                    <span> {")"} </span>
+                                                    { "Not available" }
                                                 </>
                                             }
                                         }
                                     }</td>
                                     <td>
-                                        <button onclick={onclick_remove(name.clone())} class="btn">{"Remove"}</button>
+                                    {
+                                        match word_set.calibration {
+                                            SetCalibration::Default => html! { <> { "Default" } </> },
+                                            SetCalibration::Custom(calibration) => {
+                                                let Calibration {c, a0, a1 } = calibration;
+                                                html! { <>
+                                                    { format!("Custom ({c:.3} ln({a0:.3} (x + {a1:.3})))") }
+                                                    <button onclick={onclick_reset_calibration.clone()} data-name={name.clone()} class="btn">{"Reset"} </button>
+                                                    </> }
+                                            }
+                                        }
+                                    }
+                                    </td>
+                                    <td>
+                                        <button onclick={onclick_remove.clone()} class="btn" data-name={name.clone()}>{"Remove"}</button>
                                     </td>
                                 </tr>
                             }

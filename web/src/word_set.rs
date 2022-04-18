@@ -13,6 +13,15 @@ pub enum SetCalibration {
     Custom(Calibration),
 }
 
+impl SetCalibration {
+    pub fn get_calibration(&self) -> Calibration {
+        match self {
+            SetCalibration::Default => Calibration::default(),
+            SetCalibration::Custom(calibration) => *calibration,
+        }
+    }
+}
+
 impl Default for SetCalibration {
     fn default() -> Self {
         Self::Default
@@ -34,15 +43,6 @@ impl WordSet {
             dictionary: Rc::new(dictionary),
             entropies: None,
             calibration: SetCalibration::default(),
-        }
-    }
-
-    pub fn with_entropies(&self, entropies: Rc<Vec<(usize, EntropiesData, f64)>>) -> Self {
-        Self {
-            name: self.name.clone(),
-            dictionary: self.dictionary.clone(),
-            entropies: Some(entropies),
-            calibration: self.calibration,
         }
     }
 
@@ -73,6 +73,7 @@ pub enum WordSetVecAction {
     Remove(String),
     LoadWords(String, Dictionary),
     SetEntropy(String, Rc<Vec<(usize, EntropiesData, f64)>>),
+    SetCalibration(String, SetCalibration),
 }
 
 #[derive(Clone, Debug, PartialEq, Slice, Serialize, Deserialize)]
@@ -144,20 +145,22 @@ impl Reducible for WordSetVec {
                 Rc::new(self.extend_with(WordSet::from_dictionary(name, dictionary)))
             }
             WordSetVecAction::SetEntropy(name, entropies_data) => {
-                let mut new_vec = self
-                    .0
-                    .iter()
-                    .filter(|word_set| word_set.name != name)
-                    .cloned()
-                    .collect::<Vec<_>>();
-                if let Some(word_set) = self
-                    .0
-                    .iter()
-                    .find(|word_set| word_set.name == name)
-                    .cloned()
-                {
-                    new_vec.push(word_set.with_entropies(entropies_data));
-                }
+                let mut new_vec = self.0.clone();
+                let mut entropies_data = Some(entropies_data);
+                new_vec.iter_mut().for_each(|word_set| {
+                    if word_set.name == name {
+                        word_set.entropies = entropies_data.take();
+                    }
+                });
+                Rc::new(WordSetVec(new_vec))
+            }
+            WordSetVecAction::SetCalibration(name, calibration) => {
+                let mut new_vec = self.0.clone();
+                new_vec.iter_mut().for_each(|word_set| {
+                    if word_set.name == name {
+                        word_set.calibration = calibration;
+                    }
+                });
                 Rc::new(WordSetVec(new_vec))
             }
         }

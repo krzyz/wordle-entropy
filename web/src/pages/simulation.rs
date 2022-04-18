@@ -410,8 +410,13 @@ pub fn view() -> Html {
                     Tab::Detail => html! {
                         <SimulationDetail last_scores={simulation_state.last_scores.clone()} word_set={word_set.clone()} />
                     },
-                    Tab::Calibration => html! {
-                        <Calibration data={simulation_state.turns_data.clone()} />
+                    Tab::Calibration => {
+                        html! {
+                        <Calibration
+                            data={simulation_state.turns_data.clone()}
+                            word_set_name={word_set.name.clone()}
+                            used_calibration={word_set.calibration.get_calibration()} />
+                        }
                     }
                 }
             }

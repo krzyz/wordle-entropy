@@ -16,4 +16,5 @@ clean:
 	rm -rf pkg/
 
 publish:
+	aws s3 rm s3://wordle.realcomplexity.com --recursive
 	aws s3 sync pkg s3://wordle.realcomplexity.com

@@ -129,6 +129,7 @@ impl Simulation {
             &data.answers[..],
             entropies,
             Some(uncertainty),
+            Some(data.word_set.calibration.get_calibration()),
         )
         .into_iter()
         .take(10)
