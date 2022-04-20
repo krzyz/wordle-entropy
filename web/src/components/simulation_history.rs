@@ -4,11 +4,12 @@ use web_sys::HtmlInputElement;
 use yew::{function_component, html, use_state_eq, Callback, Event, Html, Properties, TargetCast};
 
 use crate::components::{HintedWord, Plot};
+use crate::pages::GuessStep;
 use crate::{plots::ExpectedTurnsPlotter, word_set::WordSet};
 
 #[derive(Properties, PartialEq)]
 pub struct Props {
-    pub history: VecDeque<Vec<(usize, usize, f64)>>,
+    pub history: VecDeque<(usize, Vec<GuessStep>)>,
     pub history_small: Vec<(usize, usize)>,
     pub word_set: Rc<WordSet>,
 }
@@ -36,7 +37,7 @@ pub fn view(props: &Props) -> Html {
     html! {
     <div class="container">
         <div class="columns">
-            <div class="column col-6">
+            <div class="column col-6 col-xl-12">
                 <div class="form-group">
                     <label class="form-switch">
                         <input type="checkbox" onchange={on_checkbox_weighted_change} checked={*weighted_display} />
@@ -48,14 +49,14 @@ pub fn view(props: &Props) -> Html {
                     html! { <Plot<(usize, f64), ExpectedTurnsPlotter> {data} {plotter} />}
                 }}
             </div>
-            <div class="column col-6">
+            <div class="column col-6 col-xl-12">
             {
                 props.history.iter().map(|row| {
                     html! {
                         <p>
                             {
-                                row.iter().map(|(word, hints, _)| {
-                                    let word = props.word_set.dictionary.words[*word].clone();
+                                row.1.iter().map(|GuessStep { guess, hints, .. }| {
+                                    let word = props.word_set.dictionary.words[*guess].clone();
                                     let hints = props.word_set.dictionary.hints[*hints].clone();
                                     html! {
                                         <>

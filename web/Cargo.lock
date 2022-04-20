@@ -2383,6 +2383,7 @@ dependencies = [
  "gloo-utils 0.1.3",
  "gloo-worker",
  "hsl",
+ "itertools",
  "js-sys",
  "log",
  "nalgebra",

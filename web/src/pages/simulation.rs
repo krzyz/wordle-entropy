@@ -23,6 +23,16 @@ use crate::worker::{WordleWorkerInput, WordleWorkerOutput};
 use crate::worker_atom::WordleWorkerAtom;
 use crate::{EntropiesData, Hints};
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct GuessStep {
+    // word, entropy, left_turns
+    pub guess: usize,
+    pub hints: usize,
+    pub uncertainty: f64,
+    pub scores: Vec<(usize, f64, f64)>,
+    pub answers: Vec<usize>,
+}
+
 enum SimulationStateAction {
     Initialize(usize, Vec<usize>, Rc<WordSet>),
     NextStep {
@@ -40,10 +50,7 @@ struct SimulationState {
     current_turns: Vec<(f64, f64)>,
     turns_data: Vec<(f64, f64, f64)>,
     current_word: Option<usize>,
-    last_hints: Option<usize>,
-    last_guess: Option<usize>,
-    last_scores: Vec<(usize, f64, bool)>,
-    history: VecDeque<Vec<(usize, usize, f64)>>,
+    history: VecDeque<(usize, Vec<GuessStep>)>,
     history_small: Vec<(usize, usize)>,
     words_left: Vec<usize>,
     word_set: Option<Rc<WordSet>>,
@@ -58,9 +65,6 @@ impl Reducible for SimulationState {
                 current_turns: vec![],
                 turns_data: vec![],
                 current_word: Some(word),
-                last_hints: None,
-                last_guess: None,
-                last_scores: vec![],
                 history: VecDeque::new(),
                 history_small: vec![],
                 words_left,
@@ -80,20 +84,27 @@ impl Reducible for SimulationState {
                 let mut history = self.history.clone();
                 let mut history_small = self.history_small.clone();
 
-                let last_scores = scores
-                    .into_iter()
-                    .map(|(word, _, score)| (word, score, answers.contains(&word)))
-                    .collect();
-
-                let mut last_optn: Option<&mut Vec<(usize, usize, f64)>>;
+                let mut last_optn: Option<&mut (usize, Vec<GuessStep>)>;
                 let history_front = if let Some(history_front) = history.front_mut() {
                     history_front
                 } else {
-                    history.push_front(vec![]);
+                    history.push_front((self.current_word.unwrap(), vec![]));
                     last_optn = history.front_mut();
                     &mut **last_optn.as_mut().unwrap()
                 };
-                history_front.push((guess, hints.clone(), uncertainty));
+                let scores = scores
+                    .into_iter()
+                    .map(|(word, entropies_data, left_turns)| {
+                        (word, entropies_data.entropy, left_turns)
+                    })
+                    .collect::<Vec<_>>();
+                history_front.1.push(GuessStep {
+                    guess,
+                    hints,
+                    uncertainty,
+                    scores: scores.clone(),
+                    answers: answers.clone(),
+                });
 
                 current_turns.push((uncertainty, current_turns.len() as f64));
 
@@ -102,7 +113,13 @@ impl Reducible for SimulationState {
 
                     let answer = answers[0];
                     if answer != guess {
-                        history_front.push((answer, Hints::correct().to_ind(), 0.));
+                        history_front.1.push(GuessStep {
+                            guess: answer,
+                            hints: Hints::correct().to_ind(),
+                            uncertainty: 0.,
+                            scores,
+                            answers: vec![answer],
+                        });
                     }
                     if words_left.len() > 0 {
                         words_left.remove(0);
@@ -125,11 +142,11 @@ impl Reducible for SimulationState {
                     );
                     current_turns = vec![];
 
-                    history_small.push((history_front.len(), answer));
+                    history_small.push((history_front.1.len(), answer));
                     if history.len() > 10 {
                         history.pop_back();
                     }
-                    history.push_front(vec![]);
+                    history.push_front((self.current_word.unwrap(), vec![]));
                     next_word
                 } else {
                     self.current_word.clone()
@@ -139,9 +156,6 @@ impl Reducible for SimulationState {
                     current_turns,
                     turns_data,
                     current_word: word,
-                    last_hints: Some(hints),
-                    last_guess: Some(guess),
-                    last_scores,
                     history,
                     history_small,
                     words_left: words_left,
@@ -404,7 +418,7 @@ pub fn view() -> Html {
                         />
                     },
                     Tab::Detail => html! {
-                        <SimulationDetail last_scores={simulation_state.last_scores.clone()} word_set={word_set.clone()} />
+                        <SimulationDetail history={simulation_state.history.clone()} word_set={word_set.clone()} />
                     },
                     Tab::Calibration => {
                         html! {
