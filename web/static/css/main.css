@@ -30,15 +30,16 @@ ul.words_left_list {
   box-sizing: border-box;
   color: white;
   display: inline-flex;
-  font-size: 10px;
+  font-size: 15px;
   font-weight: 700;
   justify-content: center;
   text-transform: uppercase;
   line-height: 10px;
   vertical-align: middle;
-  width: 20px;
-  height: 20px;
+  width: 30px;
+  height: 30px;
   margin: 2px;
+  user-select: none;
 }
 
 .hint-wrong {

@@ -240,16 +240,16 @@ pub fn view() -> Html {
                                             let entropy = &entropy_data.entropy;
                                             html! {
                                                 <tr
-                                                    key={format!("{word}")}
+                                                    key={word.to_string()}
                                                     class={classes!(
                                                         "c-hand",
                                                         (selected_word_val).clone().map(|selected_word| { *word == selected_word }).map(|is_selected| is_selected.then(|| Some("text-primary")))
                                                     )}
                                                 >
-                                                    <td data-word={format!("{word}")}> { &word_set.dictionary.words[*word] }</td>
-                                                    <td data-word={format!("{word}")}> { format!("{entropy:.3}") } </td>
-                                                    <td data-word={format!("{word}")}> { format!("{left_turns:.3}") } </td>
-                                                    <td data-word={format!("{word}")}> { format!("{:.3}", &word_set.dictionary.probabilities[*word]) } </td>
+                                                    <td data-word={word.to_string()}> { &word_set.dictionary.words[*word] }</td>
+                                                    <td data-word={word.to_string()}> { format!("{entropy:.3}") } </td>
+                                                    <td data-word={word.to_string()}> { format!("{left_turns:.3}") } </td>
+                                                    <td data-word={word.to_string()}> { format!("{:.3}", &word_set.dictionary.probabilities[*word]) } </td>
                                                 </tr>
                                             }
                                         }).collect::<Html>()

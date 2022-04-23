@@ -3,7 +3,7 @@ use std::rc::Rc;
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use wordle_entropy_core::{
-    algo::{get_answers, get_hints_and_update},
+    algo::{get_answers, get_hints_and_update, update_knowledge},
     entropy::{calculate_entropies, entropies_scored},
 };
 
@@ -123,7 +123,12 @@ impl Simulation {
 
         let guess_word = &data.word_set.dictionary.words[guess];
         let (hints, knowledge) = match (hints, data.correct) {
-            (Some(hints), None) => (Some(hints), data.knowledge.clone()),
+            (Some(hints), None) => {
+                let guess = &data.word_set.dictionary.words[guess];
+                let hints_full = &data.word_set.dictionary.hints[hints];
+                let knowledge = update_knowledge(guess, hints_full, data.knowledge.clone());
+                (Some(hints), knowledge)
+            }
             (None, Some(correct)) => {
                 let correct = &data.word_set.dictionary.words[correct];
                 let (hints, knowledge) =

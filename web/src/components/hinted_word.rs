@@ -21,9 +21,9 @@ pub struct Props {
 #[function_component(HintedWord)]
 pub fn view(props: &Props) -> Html {
     html! {
-        props.word.0.iter().zip(props.hints.0.iter()).map(|(c, h)| {
+        props.word.0.iter().zip(props.hints.0.iter()).enumerate().map(|(i, (c, h))| {
             html! {
-                <div class={classes!("char-block", to_class(h))}>
+                <div data-i={i.to_string()} class={classes!("char-block", to_class(h))}>
                  { c }
                 </div>
             }
