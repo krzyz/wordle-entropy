@@ -11,8 +11,18 @@ use crate::{word_set::WordSet, EntropiesData, Knowledge};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum SimulationInput {
-    Start(usize, Option<usize>),
-    Continue(Option<usize>),
+    StartKnownAnswer {
+        correct: usize,
+        guess: Option<usize>,
+    },
+    StartUnknownAnswer {
+        hints: usize,
+        guess: Option<usize>,
+    },
+    Continue {
+        hints: Option<usize>,
+        guess: Option<usize>,
+    },
     Stop,
 }
 
@@ -20,7 +30,7 @@ pub enum SimulationInput {
 pub enum SimulationOutput {
     StepComplete {
         guess: usize,
-        hints: usize,
+        hints: Option<usize>,
         uncertainty: f64,
         scores: Vec<(usize, EntropiesData, f64)>,
         answers: Vec<usize>,
@@ -30,14 +40,14 @@ pub enum SimulationOutput {
 
 pub struct SimulationData {
     word_set: Rc<WordSet>,
-    correct: usize,
+    correct: Option<usize>,
     knowledge: Knowledge,
     entropies: Rc<Vec<(usize, EntropiesData, f64)>>,
     answers: Vec<usize>,
 }
 
 impl SimulationData {
-    fn new(word_set: &Rc<WordSet>, solution: usize) -> Result<Self> {
+    fn new(word_set: &Rc<WordSet>, correct: Option<usize>) -> Result<Self> {
         let entropies = word_set
             .entropies
             .as_ref()
@@ -48,7 +58,7 @@ impl SimulationData {
 
         Ok(Self {
             word_set: word_set.clone(),
-            correct: solution,
+            correct,
             knowledge: Knowledge::default(),
             entropies,
             answers,
@@ -68,8 +78,13 @@ impl Simulation {
         input: SimulationInput,
     ) -> Result<SimulationOutput> {
         match input {
-            SimulationInput::Start(correct, guess) => self.handle_start(word_set, correct, guess),
-            SimulationInput::Continue(guess) => self.handle_continue(guess),
+            SimulationInput::StartKnownAnswer { correct, guess } => {
+                self.handle_start(word_set, Some(correct), None, guess)
+            }
+            SimulationInput::StartUnknownAnswer { hints, guess } => {
+                self.handle_start(word_set, None, Some(hints), guess)
+            }
+            SimulationInput::Continue { hints, guess, .. } => self.handle_continue(hints, guess),
             SimulationInput::Stop => self.handle_stop(),
         }
     }
@@ -77,15 +92,20 @@ impl Simulation {
     pub fn handle_start(
         &mut self,
         word_set: &Rc<WordSet>,
-        correct: usize,
+        correct: Option<usize>,
+        hints: Option<usize>,
         guess: Option<usize>,
     ) -> Result<SimulationOutput> {
         self.state = Some(SimulationData::new(word_set, correct)?);
 
-        self.handle_continue(guess)
+        self.handle_continue(hints, guess)
     }
 
-    pub fn handle_continue(&mut self, guess: Option<usize>) -> Result<SimulationOutput> {
+    pub fn handle_continue(
+        &mut self,
+        hints: Option<usize>,
+        guess: Option<usize>,
+    ) -> Result<SimulationOutput> {
         let data = self.state.as_mut().ok_or(anyhow!("Missing state"))?;
 
         let guess = match guess {
@@ -102,9 +122,26 @@ impl Simulation {
         };
 
         let guess_word = &data.word_set.dictionary.words[guess];
-        let correct = &data.word_set.dictionary.words[data.correct];
-        let (hints, knowledge) = get_hints_and_update(guess_word, correct, data.knowledge.clone());
-        let hints = hints.to_ind();
+        let (hints, knowledge) = match (hints, data.correct) {
+            (Some(hints), None) => (Some(hints), data.knowledge.clone()),
+            (None, Some(correct)) => {
+                let correct = &data.word_set.dictionary.words[correct];
+                let (hints, knowledge) =
+                    get_hints_and_update(guess_word, correct, data.knowledge.clone());
+                let hints = hints.to_ind();
+                (Some(hints), knowledge)
+            }
+            (Some(_), Some(_)) => {
+                return Err(anyhow!(
+                    "Tried to pass custom hints to a simulation that already has a known solution"
+                ))
+            }
+            (None, None) => {
+                return Err(anyhow!(
+                    "Didn't pass custom hints to a simulation that doesn't have a known solution"
+                ))
+            }
+        };
 
         data.answers = get_answers(data.word_set.dictionary.words.clone(), &knowledge);
         data.knowledge = knowledge;

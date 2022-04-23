@@ -205,9 +205,15 @@ pub fn view() -> Html {
         move |output: WordleWorkerOutput| match output {
             WordleWorkerOutput::SetWordSet(_name) => (),
             WordleWorkerOutput::Simulation(output) => match output {
+                SimulationOutput::StepComplete { hints: None, .. } => {
+                    set_toast(ToastOption::new(
+                        "Expected hints to be available from the simulation step".to_string(),
+                        ToastType::Error,
+                    ));
+                }
                 SimulationOutput::StepComplete {
                     guess,
-                    hints,
+                    hints: Some(hints),
                     uncertainty,
                     scores,
                     answers,
@@ -222,7 +228,10 @@ pub fn view() -> Html {
                     let next_word = if answers.len() > 1 {
                         match send_queue.try_borrow_mut() {
                             Ok(ref mut send_queue) => {
-                                **send_queue = Some(SimulationInput::Continue(Some(next_guess)));
+                                **send_queue = Some(SimulationInput::Continue {
+                                    hints: None,
+                                    guess: Some(next_guess),
+                                });
                             }
                             _ => log::error!("Unable to borrow in worker callback 1"),
                         }
@@ -232,8 +241,10 @@ pub fn view() -> Html {
                             let next_word = &words_left.borrow()[0];
                             match send_queue.try_borrow_mut() {
                                 Ok(ref mut send_queue) => {
-                                    **send_queue =
-                                        Some(SimulationInput::Start(next_word.clone(), None));
+                                    **send_queue = Some(SimulationInput::StartKnownAnswer {
+                                        correct: next_word.clone(),
+                                        guess: None,
+                                    });
                                 }
                                 _ => log::error!("Unable to borrow in worker callback 2"),
                             }
@@ -325,9 +336,12 @@ pub fn view() -> Html {
                     words,
                     word_set.clone(),
                 ));
-                worker.send(WordleWorkerInput::Simulation(SimulationInput::Start(
-                    word, None,
-                )));
+                worker.send(WordleWorkerInput::Simulation(
+                    SimulationInput::StartKnownAnswer {
+                        correct: word,
+                        guess: None,
+                    },
+                ));
             }
         })
     };
