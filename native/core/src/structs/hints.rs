@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{iter::repeat, str::FromStr};
 
 #[cfg(feature = "terminal")]
 use colored::Colorize;
@@ -176,6 +176,16 @@ impl<const N: usize> TryFrom<Vec<Hint>> for HintsN<N> {
         } else {
             Ok(Self(value.try_into().unwrap()))
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ValidHints(pub Vec<Vec<Hint>>);
+
+impl ValidHints {
+    pub fn empty(n: usize) -> Self {
+        let vec = repeat(vec![]).take(n).collect();
+        Self(vec)
     }
 }
 

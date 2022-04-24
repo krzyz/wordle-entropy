@@ -1,5 +1,9 @@
 use crate::structs::{
-    hints::Hint, hints::HintsN, knowledge::KnowledgeN, knowledge::PartialChar, word::WordN,
+    hints::Hint,
+    hints::{HintsN, ValidHints},
+    knowledge::KnowledgeN,
+    knowledge::PartialChar,
+    word::WordN,
 };
 use arrayvec::ArrayVec;
 use fxhash::FxHashMap;
@@ -119,6 +123,52 @@ pub fn get_hints_and_update<const N: usize>(
     let knowledge = update_knowledge(guess, &hints, knowledge);
 
     (hints, knowledge)
+}
+
+pub fn get_valid_hints<const N: usize>(
+    guess: &WordN<char, N>,
+    knowledge: &KnowledgeN<N>,
+) -> ValidHints {
+    let ruled_out = &knowledge.ruled_out;
+    let known = knowledge.known.clone();
+
+    let vec = knowledge
+        .placed
+        .word
+        .iter()
+        .zip(guess.0.iter())
+        .map(|(p, g)| {
+            let known = if let Some(&n) = known.get(g) {
+                if n == 0 {
+                    false
+                } else {
+                    true
+                }
+            } else {
+                false
+            };
+
+            match p {
+                PartialChar::Some(c) if g == c => {
+                    vec![Hint::Correct]
+                }
+                _ if ruled_out.contains(&g) => {
+                    vec![Hint::Wrong]
+                }
+                PartialChar::Excluded(excluded) if excluded.contains(&g) => {
+                    vec![Hint::Wrong]
+                }
+                PartialChar::Some(_) | PartialChar::Excluded(_) | PartialChar::None if known => {
+                    vec![Hint::OutOfPlace, Hint::Correct]
+                }
+                PartialChar::Some(_) | PartialChar::Excluded(_) | PartialChar::None => {
+                    vec![Hint::Wrong, Hint::OutOfPlace, Hint::Correct]
+                }
+            }
+        })
+        .collect::<Vec<_>>();
+
+    ValidHints(vec)
 }
 
 pub fn check<const N: usize>(word: &WordN<char, N>, knowledge: &KnowledgeN<N>) -> bool {
