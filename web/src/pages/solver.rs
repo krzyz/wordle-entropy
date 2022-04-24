@@ -6,8 +6,8 @@ use serde_cbor::ser::to_vec_packed;
 use web_sys::{HtmlElement, HtmlInputElement};
 use wordle_entropy_core::structs::hints::Hint;
 use yew::{
-    classes, function_component, html, use_effect_with_deps, use_state, use_state_eq, Callback,
-    Event, MouseEvent, TargetCast,
+    classes, function_component, html, use_effect_with_deps, use_reducer, use_state, use_state_eq,
+    Callback, Event, MouseEvent, Reducible, TargetCast,
 };
 
 use crate::components::{HintedWord, SimulationDetail, ToastOption, ToastType};
@@ -15,7 +15,7 @@ use crate::simulation::{SimulationInput, SimulationOutput};
 use crate::word_set::get_current_word_set;
 use crate::worker::{WordleWorkerInput, WordleWorkerOutput};
 use crate::worker_atom::WordleWorkerAtom;
-use crate::{Hints, Word};
+use crate::{EntropiesData, Hints, Word};
 
 use super::GuessStep;
 
@@ -28,10 +28,70 @@ fn parse_word(word: &str, words: &Vec<Word>) -> Result<(usize, Word)> {
     Ok((i, word))
 }
 
+enum SolverStateAction {
+    NextStep {
+        guess: usize,
+        hints: usize,
+        uncertainty: f64,
+        scores: Vec<(usize, EntropiesData, f64)>,
+        answers: Vec<usize>,
+    },
+}
+
+#[derive(Clone, Default, PartialEq)]
+struct SolverState {
+    history: VecDeque<(usize, Vec<GuessStep>)>,
+}
+
+impl Reducible for SolverState {
+    type Action = SolverStateAction;
+
+    fn reduce(self: Rc<Self>, action: Self::Action) -> Rc<Self> {
+        match action {
+            SolverStateAction::NextStep {
+                guess,
+                hints,
+                uncertainty,
+                scores,
+                answers,
+            } => {
+                let mut history = self.history.clone();
+
+                let mut last_optn: Option<&mut (usize, Vec<GuessStep>)>;
+                log::info!("History length: {}", history.len());
+                let history_front = if let Some(history_front) = history.front_mut() {
+                    history_front
+                } else {
+                    log::info!("new history");
+                    history.push_front((0, vec![]));
+                    last_optn = history.front_mut();
+                    &mut **last_optn.as_mut().unwrap()
+                };
+
+                let scores = scores
+                    .into_iter()
+                    .map(|(word, entropies_data, left_turns)| {
+                        (word, entropies_data.entropy, left_turns)
+                    })
+                    .collect::<Vec<_>>();
+                history_front.1.push(GuessStep {
+                    guess,
+                    hints,
+                    uncertainty,
+                    scores: scores.clone(),
+                    answers: answers.clone(),
+                });
+
+                Rc::new(Self { history })
+            }
+        }
+    }
+}
+
 #[function_component(Solver)]
 pub fn view() -> Html {
     let word_set = Rc::new(get_current_word_set());
-    let history = use_state(|| -> VecDeque<(usize, Vec<GuessStep>)> { VecDeque::new() });
+    let solver_state = use_reducer(|| SolverState::default());
     let set_toast = use_atom_setter::<ToastOption>();
     let word = use_state_eq(|| {
         if let Some(&word) = word_set
@@ -52,7 +112,7 @@ pub fn view() -> Html {
 
     let cb = {
         let set_toast = set_toast.clone();
-        let history = history.clone();
+        let solver_state = solver_state.clone();
 
         move |output: WordleWorkerOutput| match output {
             WordleWorkerOutput::SetWordSet(_name) => (),
@@ -64,35 +124,15 @@ pub fn view() -> Html {
                     scores,
                     answers,
                     ..
-                } => {
-                    let mut new_history = (*history).clone();
-                    let mut last_optn: Option<&mut (usize, Vec<GuessStep>)>;
-                    let history_front = if let Some(history_front) = new_history.front_mut() {
-                        history_front
-                    } else {
-                        new_history.push_front((0, vec![]));
-                        last_optn = new_history.front_mut();
-                        &mut **last_optn.as_mut().unwrap()
-                    };
-
-                    let scores = scores
-                        .into_iter()
-                        .map(|(word, entropies_data, left_turns)| {
-                            (word, entropies_data.entropy, left_turns)
-                        })
-                        .collect::<Vec<_>>();
-                    history_front.1.push(GuessStep {
-                        guess,
-                        hints,
-                        uncertainty,
-                        scores: scores.clone(),
-                        answers: answers.clone(),
-                    });
-
-                    history.set(new_history);
-                }
+                } => solver_state.dispatch(SolverStateAction::NextStep {
+                    guess,
+                    hints,
+                    uncertainty,
+                    scores,
+                    answers,
+                }),
                 _ => set_toast(ToastOption::new(
-                    "Unexpected worker output".to_string(),
+                    "Hints missing from the step output".to_string(),
                     ToastType::Error,
                 )),
             },
@@ -203,7 +243,7 @@ pub fn view() -> Html {
                     </div>
                 </div>
             </div>
-            <SimulationDetail history={(*history).clone()} word_set={word_set.clone()} />
+            <SimulationDetail history={solver_state.history.clone()} word_set={word_set.clone()} />
         </section>
     }
 }
