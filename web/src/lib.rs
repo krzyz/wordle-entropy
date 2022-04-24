@@ -6,6 +6,7 @@ pub mod main_app;
 mod pages;
 mod plots;
 mod simulation;
+mod util;
 mod word_set;
 mod worker;
 mod worker_atom;

@@ -6,9 +6,53 @@ use yew::{function_component, html, use_state_eq, Html, Properties};
 use crate::components::HintedWord;
 use crate::{pages::GuessStep, word_set::WordSet};
 
+pub fn render_suggestions(
+    scores: &Vec<(usize, f64, f64)>,
+    answers: &Vec<usize>,
+    word_set: &WordSet,
+    num_answers_before: usize,
+) -> Html {
+    scores
+        .iter()
+        .map(|&(word_ind, entropy, score)| {
+            //let score = score + step.1.len() as f64 - if ended { 1. } else { 0. };
+            let score = score + num_answers_before as f64;
+            let word = &word_set.dictionary.words[word_ind];
+            let possible = answers.contains(&word_ind);
+            let row = vec![
+                format!("{word}"),
+                format!("{entropy:.3}"),
+                format!("{score:.3}"),
+            ]
+            .into_iter()
+            .map(|text| {
+                html! {
+                    <td>
+                        if possible {
+                            <u> { text } </u>
+                        } else {
+                            { text }
+                        }
+                    </td>
+                }
+            })
+            .collect::<Html>();
+
+            html! {
+                <tr>
+                    { row }
+                </tr>
+            }
+        })
+        .collect::<Html>()
+}
+
 #[derive(Properties, PartialEq)]
 pub struct Props {
+    #[prop_or_default]
     pub history: VecDeque<(usize, Vec<GuessStep>)>,
+    #[prop_or_default]
+    pub init_scores: Option<Vec<(usize, f64, f64)>>,
     pub word_set: Rc<WordSet>,
 }
 
@@ -32,31 +76,21 @@ pub fn view(props: &Props) -> Html {
         }
     };
 
-    if let Some(step) = step {
-        let (last_useful_info, ended) =
-            if let Some((last, second_to_last)) = step.1.iter().rev().next_tuple() {
-                if last.answers.len() == 1 {
-                    (Some(second_to_last), true)
-                } else {
-                    (Some(last), false)
-                }
-            } else {
-                (step.1.iter().last(), false)
-            };
-
-        html! {
-            <div class="container">
-                <div class="columns">
-                    <div class="column col-3">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th> { "# Possibilities" } </th>
-                                    <th> { "Uncertainty" } </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            {
+    html! {
+        <div class="container">
+            <div class="columns">
+                <div class="column col-2 col-xl-1 col-md-12" />
+                <div class="column col-3 col-md-4 col-xs-12">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th> { "# Possibilities" } </th>
+                                <th> { "Uncertainty" } </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {
+                            if let Some(step) = step {
                                 step.1.iter().map(|GuessStep {uncertainty, ref answers, .. }| {
                                     html! {
                                         <tr>
@@ -65,11 +99,15 @@ pub fn view(props: &Props) -> Html {
                                         </tr>
                                     }
                                 }).collect::<Html>()
+                            } else {
+                                html! {}
                             }
-                            </tbody>
-                        </table>
-                        <ul>
-                        {
+                        }
+                        </tbody>
+                    </table>
+                    <ul>
+                    {
+                        if let Some(step) = step {
                             if let Some(GuessStep { ref answers, .. }) = step.1.iter().last() {
                                 answers.iter().map(|&answer| {
                                     let probability = word_set.dictionary.probabilities[answer];
@@ -79,20 +117,24 @@ pub fn view(props: &Props) -> Html {
                                     }
                                 }).collect::<Html>()
                             } else {
-                                html! { <> </> }
+                                html! {}
                             }
+                        } else {
+                            html! {}
                         }
-                        </ul>
-                    </div>
-                    <div class="column col-2 col-mx-auto">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th> { "Hints so far" } </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            {
+                    }
+                    </ul>
+                </div>
+                <div class="column col-2 col-md-4 col-xs-8 col-mx-auto">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th> { "Hints so far" } </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {
+                            if let Some(step) = step {
                                 step.1.iter().map(|&GuessStep { guess, hints, .. }| {
                                     let word = &word_set.dictionary.words[guess];
                                     let hints = &word_set.dictionary.hints[hints];
@@ -104,51 +146,54 @@ pub fn view(props: &Props) -> Html {
                                         </tr>
                                     }
                                 }).collect::<Html>()
+                            } else {
+                                html! {}
                             }
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="column col-4">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th> { "Top picks" } </th>
-                                    <th> { "E[Info.]" } </th>
-                                    <th> { "E[Turns]" } </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                if let Some(GuessStep { ref answers, ref scores, .. }) = last_useful_info {{
-                                    scores.iter().map(|&(word_ind, entropy, score)| {
-                                        let score = score + step.1.len() as f64 - if ended { 1. } else { 0. };
-                                        let word = &word_set.dictionary.words[word_ind];
-                                        let possible = answers.contains(&word_ind);
-                                        let row = vec![ format!("{word}"), format!("{entropy:.3}"), format!("{score:.3}")].into_iter().map(|text| {
-                                            html! {
-                                                <td>
-                                                    if possible {
-                                                        <u> { text } </u>
-                                                    } else {
-                                                        { text }
-                                                    }
-                                                </td>
-                                            }
-                                        }).collect::<Html>();
-
-                                        html! {
-                                            <tr>
-                                                { row }
-                                            </tr>
-                                        }
-                                    }).collect::<Html>()
-                                }}
-                            </tbody>
-                        </table>
-                    </div>
+                        }
+                        </tbody>
+                    </table>
                 </div>
+                <div class="column col-3 col-md-4 col-xs-12">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th> { "Top picks" } </th>
+                                <th> { "E[Info.]" } </th>
+                                <th> { "E[Turns]" } </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {
+                            if let Some(step) = step {{{
+                                let (last_useful_info, ended) =
+                                    if let Some((last, second_to_last)) = step.1.iter().rev().next_tuple() {
+                                        if last.answers.len() == 1 {
+                                            (Some(second_to_last), true)
+                                        } else {
+                                            (Some(last), false)
+                                        }
+                                    } else {
+                                        (step.1.iter().last(), false)
+                                    };
+
+                                if let Some(GuessStep { ref answers, ref scores, .. }) = last_useful_info {{{
+                                    let num_answers_before = step.1.len() - if ended { 1 } else { 0 };
+                                    render_suggestions(scores, answers, word_set.as_ref(), num_answers_before)
+                                }}} else {
+                                    html! {}
+                                }
+                            }}} else if let Some(scores) = props.init_scores.clone() {{{
+                                let answers = (0..word_set.dictionary.words.len()).collect::<Vec<_>>();
+                                render_suggestions(&scores, &answers, word_set.as_ref(), 0)
+                            }}} else {
+                                html! {}
+                            }
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="column col-2 col-xl-1 col-md-12" />
             </div>
-        }
-    } else {
-        html! { <> </> }
+        </div>
     }
 }

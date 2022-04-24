@@ -18,6 +18,7 @@ use crate::components::{
     ToastType,
 };
 use crate::simulation::{SimulationInput, SimulationOutput};
+use crate::util::scores_without_full_data;
 use crate::word_set::{get_current_word_set, WordSet};
 use crate::worker::{WordleWorkerInput, WordleWorkerOutput};
 use crate::worker_atom::WordleWorkerAtom;
@@ -92,12 +93,8 @@ impl Reducible for SimulationState {
                     last_optn = history.front_mut();
                     &mut **last_optn.as_mut().unwrap()
                 };
-                let scores = scores
-                    .into_iter()
-                    .map(|(word, entropies_data, left_turns)| {
-                        (word, entropies_data.entropy, left_turns)
-                    })
-                    .collect::<Vec<_>>();
+                let scores = scores_without_full_data(scores);
+
                 history_front.1.push(GuessStep {
                     guess,
                     hints,
