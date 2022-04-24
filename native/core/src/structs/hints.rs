@@ -179,12 +179,19 @@ impl<const N: usize> TryFrom<Vec<Hint>> for HintsN<N> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ValidHints(pub Vec<Vec<Hint>>);
 
 impl ValidHints {
     pub fn empty(n: usize) -> Self {
         let vec = repeat(vec![]).take(n).collect();
+        Self(vec)
+    }
+
+    pub fn any(n: usize) -> Self {
+        let vec = repeat(vec![Hint::Wrong, Hint::OutOfPlace, Hint::Correct])
+            .take(n)
+            .collect();
         Self(vec)
     }
 }

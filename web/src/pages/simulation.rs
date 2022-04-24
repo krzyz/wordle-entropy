@@ -214,6 +214,7 @@ pub fn view() -> Html {
                     uncertainty,
                     scores,
                     answers,
+                    ..
                 } => {
                     let next_guess = scores
                         .iter()

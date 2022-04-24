@@ -34,6 +34,7 @@ pub enum SimulationOutput {
         uncertainty: f64,
         scores: Vec<(usize, EntropiesData, f64)>,
         answers: Vec<usize>,
+        knowledge: Knowledge,
     },
     Stopped,
 }
@@ -149,7 +150,7 @@ impl Simulation {
         };
 
         data.answers = get_answers(data.word_set.dictionary.words.clone(), &knowledge);
-        data.knowledge = knowledge;
+        data.knowledge = knowledge.clone();
 
         let prob_norm: f64 = data
             .answers
@@ -177,12 +178,14 @@ impl Simulation {
         .into_iter()
         .take(10)
         .collect::<Vec<_>>();
+
         Ok(SimulationOutput::StepComplete {
             guess,
             hints,
             uncertainty,
             scores,
             answers: data.answers.clone(),
+            knowledge,
         })
     }
 

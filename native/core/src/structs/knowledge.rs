@@ -1,15 +1,19 @@
 use fxhash::FxHashMap;
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use std::{collections::HashSet, iter};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PartialChar {
     None,
     Excluded(HashSet<char>),
     Some(char),
 }
 
-#[derive(Debug, Clone)]
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PartialWord<const N: usize> {
+    #[serde_as(as = "[_; N]")]
     pub word: [PartialChar; N],
 }
 
@@ -45,7 +49,7 @@ impl<const N: usize> TryFrom<Vec<PartialChar>> for PartialWord<N> {
     }
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct KnowledgeN<const N: usize> {
     pub known: FxHashMap<char, u8>,
     pub ruled_out: HashSet<char>,

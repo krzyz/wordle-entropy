@@ -4,10 +4,12 @@ use anyhow::{anyhow, Result};
 use bounce::use_atom_setter;
 use serde_cbor::ser::to_vec_packed;
 use web_sys::{HtmlElement, HtmlInputElement};
-use wordle_entropy_core::structs::hints::Hint;
+use wordle_entropy_core::algo::get_valid_hints;
+use wordle_entropy_core::structs::hints::{Hint, ValidHints};
+use wordle_entropy_core::structs::HintsN;
 use yew::{
-    classes, function_component, html, use_effect_with_deps, use_reducer, use_state_eq, Callback,
-    Event, MouseEvent, Reducible, TargetCast,
+    classes, function_component, html, use_effect_with_deps, use_reducer, Callback, Event,
+    MouseEvent, Reducible, TargetCast,
 };
 use yew_router::history::History;
 use yew_router::hooks::use_history;
@@ -19,7 +21,7 @@ use crate::util::scores_without_full_data;
 use crate::word_set::{get_current_word_set, WordSet};
 use crate::worker::{WordleWorkerInput, WordleWorkerOutput};
 use crate::worker_atom::WordleWorkerAtom;
-use crate::{EntropiesData, Hints, Word};
+use crate::{EntropiesData, Hints, Knowledge, Word, WORD_SIZE};
 
 use super::GuessStep;
 
@@ -39,12 +41,14 @@ enum SolverStateAction {
         uncertainty: f64,
         scores: Vec<(usize, EntropiesData, f64)>,
         answers: Vec<usize>,
+        knowledge: Knowledge,
     },
 }
 
 #[derive(Clone, Default, PartialEq)]
 struct SolverState {
     history: VecDeque<(usize, Vec<GuessStep>)>,
+    knowledge: Knowledge,
 }
 
 impl Reducible for SolverState {
@@ -58,15 +62,14 @@ impl Reducible for SolverState {
                 uncertainty,
                 scores,
                 answers,
+                knowledge,
             } => {
                 let mut history = self.history.clone();
 
                 let mut last_optn: Option<&mut (usize, Vec<GuessStep>)>;
-                log::info!("History length: {}", history.len());
                 let history_front = if let Some(history_front) = history.front_mut() {
                     history_front
                 } else {
-                    log::info!("new history");
                     history.push_front((0, vec![]));
                     last_optn = history.front_mut();
                     &mut **last_optn.as_mut().unwrap()
@@ -82,20 +85,23 @@ impl Reducible for SolverState {
                     answers: answers.clone(),
                 });
 
-                Rc::new(Self { history })
+                Rc::new(Self { history, knowledge })
             }
         }
     }
 }
 
 enum WordStateAction {
-    NewWord(String, Rc<WordSet>),
+    NewWord(String, Rc<WordSet>, Knowledge),
+    ToggleHint(usize, Knowledge),
 }
 
 #[derive(Clone, PartialEq)]
 struct WordState {
     word_ind: Option<usize>,
     word: Word,
+    hints: Hints,
+    valid_hints: ValidHints,
     error: Option<String>,
 }
 
@@ -106,27 +112,63 @@ impl Reducible for WordState {
         let WordState {
             mut word_ind,
             mut word,
-            ..
+            mut valid_hints,
+            mut hints,
+            mut error,
         } = (*self).clone();
-        let error;
         match action {
-            WordStateAction::NewWord(new_word, word_set) => {
+            WordStateAction::NewWord(new_word, word_set, knowledge) => {
                 match parse_word(new_word.as_str(), &word_set.dictionary.words) {
                     Ok((i, new_word)) => {
                         word_ind = Some(i);
                         word = new_word;
                         error = None;
+                        valid_hints = get_valid_hints(&word, &self.hints, &knowledge);
+
+                        hints = HintsN::<WORD_SIZE>(
+                            hints
+                                .0
+                                .into_iter()
+                                .zip(valid_hints.0.iter())
+                                .map(|(h, valid)| {
+                                    if valid.contains(&h) {
+                                        h
+                                    } else {
+                                        valid.first().copied().unwrap_or(Hint::Wrong)
+                                    }
+                                })
+                                .collect::<Vec<_>>()
+                                .try_into()
+                                .unwrap(),
+                        )
                     }
                     Err(err) => {
                         error = Some(err.to_string());
                     }
                 }
             }
+            WordStateAction::ToggleHint(i, knowledge) => {
+                let old_hint = hints.0[i];
+                let valid = &valid_hints.0[i];
+                let hint_pos = valid.iter().position(|&x| x == old_hint).unwrap_or(0);
+
+                let valid_hints_len = valid.len();
+
+                hints.0[i] = if valid_hints_len > 0 {
+                    valid[(hint_pos + 1) % valid_hints_len]
+                } else {
+                    Hint::Wrong
+                };
+
+                valid_hints = get_valid_hints(&self.word, &self.hints, &knowledge);
+            }
         }
 
         Rc::new(Self {
             word_ind,
             word,
+            hints,
+            valid_hints,
             error,
         })
     }
@@ -152,11 +194,11 @@ pub fn view() -> Html {
         WordState {
             word_ind,
             word,
+            hints: Hints::wrong(),
+            valid_hints: ValidHints::any(WORD_SIZE),
             error: None,
         }
     });
-
-    let hints = use_state_eq(|| Hints::wrong());
 
     let cb = {
         let set_toast = set_toast.clone();
@@ -171,13 +213,14 @@ pub fn view() -> Html {
                     uncertainty,
                     scores,
                     answers,
-                    ..
+                    knowledge,
                 } => solver_state.dispatch(SolverStateAction::NextStep {
                     guess,
                     hints,
                     uncertainty,
                     scores,
                     answers,
+                    knowledge,
                 }),
                 _ => set_toast(ToastOption::new(
                     "Hints missing from the step output".to_string(),
@@ -209,7 +252,9 @@ pub fn view() -> Html {
     }
 
     let onclick_hints = {
-        let hints = hints.clone();
+        let word_state = word_state.clone();
+        let solver_state = solver_state.clone();
+
         Callback::from(move |e: MouseEvent| {
             let element: HtmlElement = e.target_unchecked_into();
             if let Some(i) = element
@@ -217,13 +262,10 @@ pub fn view() -> Html {
                 .get("i")
                 .and_then(|i| i.parse::<usize>().ok())
             {
-                let mut new_hints = (*hints).clone();
-                new_hints.0[i] = match hints.0[i] {
-                    Hint::Wrong => Hint::OutOfPlace,
-                    Hint::OutOfPlace => Hint::Correct,
-                    Hint::Correct => Hint::Wrong,
-                };
-                hints.set(new_hints)
+                word_state.dispatch(WordStateAction::ToggleHint(
+                    i,
+                    solver_state.knowledge.clone(),
+                ));
             }
         })
     };
@@ -231,30 +273,39 @@ pub fn view() -> Html {
     let onchange_input = {
         let word_state = word_state.clone();
         let word_set = word_set.clone();
+        let solver_state = solver_state.clone();
 
         Callback::from(move |e: Event| {
             let input: HtmlInputElement = e.target_unchecked_into();
             word_state.dispatch(WordStateAction::NewWord(
                 input.value().clone(),
                 word_set.clone(),
+                solver_state.knowledge.clone(),
             ));
         })
     };
 
     let onclick_enter = {
         let worker = worker.clone();
-        let hints = hints.clone();
         let word_state = word_state.clone();
         let set_toast = set_toast.clone();
+        let solver_state = solver_state.clone();
 
         Callback::from(move |_| {
             if let Some(guess) = word_state.word_ind {
-                worker.send(WordleWorkerInput::Simulation(
-                    SimulationInput::StartUnknownAnswer {
-                        hints: hints.to_ind(),
+                if solver_state.history.len() == 0 {
+                    worker.send(WordleWorkerInput::Simulation(
+                        SimulationInput::StartUnknownAnswer {
+                            hints: word_state.hints.to_ind(),
+                            guess: Some(guess),
+                        },
+                    ))
+                } else {
+                    worker.send(WordleWorkerInput::Simulation(SimulationInput::Continue {
+                        hints: Some(word_state.hints.to_ind()),
                         guess: Some(guess),
-                    },
-                ))
+                    }))
+                }
             } else {
                 set_toast(ToastOption::new(
                     "Guess is not a valid word!".to_string(),
@@ -290,7 +341,7 @@ pub fn view() -> Html {
                             { "Hints (click each block to change)" }
                             </label>
                             <div onclick={onclick_hints} class="c-hand">
-                                <HintedWord word={word_state.word.clone()} hints={(*hints).clone()} />
+                                <HintedWord word={word_state.word.clone()} hints={word_state.hints.clone()} />
                             </div>
                         </div>
                         <button class="btn btn-primary mx-1" onclick={onclick_enter}>{ "Enter" }</button>

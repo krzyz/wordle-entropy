@@ -127,18 +127,39 @@ pub fn get_hints_and_update<const N: usize>(
 
 pub fn get_valid_hints<const N: usize>(
     guess: &WordN<char, N>,
+    hints: &HintsN<N>,
     knowledge: &KnowledgeN<N>,
 ) -> ValidHints {
     let ruled_out = &knowledge.ruled_out;
-    let known = knowledge.known.clone();
+    let known = &knowledge.known;
 
     let vec = knowledge
         .placed
         .word
         .iter()
         .zip(guess.0.iter())
-        .map(|(p, g)| {
-            let known = if let Some(&n) = known.get(g) {
+        .enumerate()
+        .map(|(i, (p, g))| {
+            let mut known = known.clone();
+
+            for (_, ((&h, &g), p)) in hints
+                .0
+                .iter()
+                .zip(guess.0.iter())
+                .zip(knowledge.placed.word.iter())
+                .enumerate()
+                .filter(|&(j, _)| j != i)
+            {
+                if h == Hint::OutOfPlace
+                    || (h == Hint::Correct && !matches!(p, &PartialChar::Some(_)))
+                {
+                    if let Some(i) = known.get_mut(&g) {
+                        *i = i.saturating_sub(1);
+                    }
+                }
+            }
+
+            let char_known = if let Some(&n) = known.get(g) {
                 if n == 0 {
                     false
                 } else {
@@ -156,9 +177,11 @@ pub fn get_valid_hints<const N: usize>(
                     vec![Hint::Wrong]
                 }
                 PartialChar::Excluded(excluded) if excluded.contains(&g) => {
-                    vec![Hint::Wrong]
+                    vec![Hint::Wrong, Hint::OutOfPlace]
                 }
-                PartialChar::Some(_) | PartialChar::Excluded(_) | PartialChar::None if known => {
+                PartialChar::Some(_) | PartialChar::Excluded(_) | PartialChar::None
+                    if char_known =>
+                {
                     vec![Hint::OutOfPlace, Hint::Correct]
                 }
                 PartialChar::Some(_) | PartialChar::Excluded(_) | PartialChar::None => {
