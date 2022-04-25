@@ -176,6 +176,9 @@ pub fn get_valid_hints<const N: usize>(
                 _ if ruled_out.contains(&g) => {
                     vec![Hint::Wrong]
                 }
+                PartialChar::Some(c) if g != c => {
+                    vec![Hint::Wrong, Hint::OutOfPlace]
+                }
                 PartialChar::Excluded(excluded) if excluded.contains(&g) => {
                     vec![Hint::Wrong, Hint::OutOfPlace]
                 }
