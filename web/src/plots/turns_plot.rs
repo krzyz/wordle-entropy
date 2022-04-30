@@ -27,19 +27,19 @@ impl Plotter for TurnsLeftPlotter {
             .into_drawing_area();
 
         let y_max = 1.
-            + self
-                .bar_data
+            + data_with_weights
                 .iter()
-                .filter_map(|&((_, left), prob)| (prob > 0.2).then(|| left))
+                .filter_map(|&(_, left, prob)| (prob > 0.2).then(|| left))
                 .max_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Less))
                 .unwrap_or(5.) as f64;
 
-        let x_max = self
-            .bar_data
-            .iter()
-            .map(|&((x, _), _)| x)
-            .max_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Less))
-            .unwrap_or(5.) as f64;
+        let x_max = 0.5
+            + self
+                .bar_data
+                .iter()
+                .map(|&((x, _), _)| x)
+                .max_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Less))
+                .unwrap_or(7.) as f64;
 
         root.fill(&WHITE)?;
         let root = root.margin(10u32, 10u32, 10u32, 10u32);
@@ -71,7 +71,7 @@ impl Plotter for TurnsLeftPlotter {
             let color = &RED;
             chart
                 .draw_series(LineSeries::new(
-                    (0..=((axis_val_multiplier * x_max.floor()) as i32 + 1))
+                    (0..=((axis_val_multiplier * x_max.ceil()) as i32 + 1))
                         .map(|x| (x as f64) / axis_val_multiplier)
                         .map(|x| (x, bounded_log_c(x, calibration))),
                     color,
@@ -84,7 +84,7 @@ impl Plotter for TurnsLeftPlotter {
             let color = &BLUE;
             chart
                 .draw_series(LineSeries::new(
-                    (0..=((axis_val_multiplier * x_max.floor()) as i32 + 1))
+                    (0..=((axis_val_multiplier * x_max.ceil()) as i32 + 1))
                         .map(|x| (x as f64) / axis_val_multiplier)
                         .map(|x| (x, bounded_log_c(x, self.used_calibration))),
                     color,
