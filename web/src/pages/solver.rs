@@ -2,6 +2,7 @@ use std::{collections::VecDeque, rc::Rc};
 
 use anyhow::{anyhow, Result};
 use bounce::use_atom_setter;
+use itertools::izip;
 use serde_cbor::ser::to_vec_packed;
 use web_sys::{HtmlElement, HtmlInputElement};
 use wordle_entropy_core::algo::get_valid_hints;
@@ -120,19 +121,23 @@ impl Reducible for WordState {
             WordStateAction::NewWord(new_word, word_set, knowledge) => {
                 match parse_word(new_word.as_str(), &word_set.dictionary.words) {
                     Ok((i, new_word)) => {
+                        let same_chars = word
+                            .0
+                            .iter()
+                            .zip(new_word.0.iter())
+                            .map(|(o, n)| o == n)
+                            .collect::<Vec<_>>();
+
                         word_ind = Some(i);
                         word = new_word;
                         error = None;
                         valid_hints = get_valid_hints(&word, &self.hints, &knowledge);
 
                         hints = HintsN::<WORD_SIZE>(
-                            hints
-                                .0
-                                .into_iter()
-                                .zip(valid_hints.0.iter())
-                                .map(|(h, valid)| {
-                                    if valid.contains(&h) {
-                                        h
+                            izip!(&hints.0, &valid_hints.0, same_chars)
+                                .map(|(h, valid, same)| {
+                                    if valid.contains(h) && same {
+                                        *h
                                     } else {
                                         valid.first().copied().unwrap_or(Hint::Wrong)
                                     }
@@ -322,6 +327,23 @@ pub fn view() -> Html {
         })
     };
 
+    let onclick_suggestion = {
+        let word_state = word_state.clone();
+        let word_set = word_set.clone();
+        let solver_state = solver_state.clone();
+
+        Callback::from(move |e: MouseEvent| {
+            let element: HtmlElement = e.target_unchecked_into();
+            if let Some(word) = element.dataset().get("word") {
+                word_state.dispatch(WordStateAction::NewWord(
+                    word,
+                    word_set.clone(),
+                    solver_state.knowledge.clone(),
+                ));
+            }
+        })
+    };
+
     html! {
         <section>
             <div class="container">
@@ -350,15 +372,24 @@ pub fn view() -> Html {
                 </div>
             </div>
             {{
-                if solver_state.history.len() > 0 {
-                    html! { <SimulationDetail history={solver_state.history.clone()} word_set={word_set.clone()} /> }
+                let (history, init_scores) = if solver_state.history.len() > 0 {
+                    (Some(solver_state.history.clone()), None)
                 } else if let Some(entropies) = word_set.entropies.as_ref() {
                     let init_scores = scores_without_full_data((**entropies).iter().take(10).cloned().collect::<Vec<_>>());
-                    html! { <SimulationDetail word_set={word_set.clone()} init_scores={init_scores} /> }
+                    (None, Some(init_scores))
                 } else {
-                    html! {r#" No word entropies available. Please ensure a word set is loaded and click "Run" on the "Entropy Calculation" page"#}
-                }
+                    (None, None)
+                };
 
+                if let (None, None) = (history.as_ref(), init_scores.as_ref()) {
+                    html! {r#" No word entropies available. Please ensure a word set is loaded and click "Run" on the "Entropy Calculation" page"#}
+                } else {
+                    html! {
+                        <div onclick={onclick_suggestion} >
+                            <SimulationDetail word_set={word_set.clone()} init_scores={init_scores} history={history} />
+                        </div>
+                    }
+                }
             }}
         </section>
     }

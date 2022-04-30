@@ -27,9 +27,9 @@ pub fn render_suggestions(
             .into_iter()
             .map(|text| {
                 html! {
-                    <td>
+                    <td data-word={word.to_string()}>
                         if possible {
-                            <u> { text } </u>
+                            <u data-word={word.to_string()}> { text } </u>
                         } else {
                             { text }
                         }
@@ -39,7 +39,7 @@ pub fn render_suggestions(
             .collect::<Html>();
 
             html! {
-                <tr>
+                <tr class="c-hand">
                     { row }
                 </tr>
             }
@@ -50,7 +50,7 @@ pub fn render_suggestions(
 #[derive(Properties, PartialEq)]
 pub struct Props {
     #[prop_or_default]
-    pub history: VecDeque<(usize, Vec<GuessStep>)>,
+    pub history: Option<VecDeque<(usize, Vec<GuessStep>)>>,
     #[prop_or_default]
     pub init_scores: Option<Vec<(usize, f64, f64)>>,
     pub word_set: Rc<WordSet>,
@@ -60,14 +60,16 @@ pub struct Props {
 pub fn view(props: &Props) -> Html {
     let selected = use_state_eq(|| -> Option<usize> { None });
     let word_set = props.word_set.clone();
+    let empty_history = VecDeque::default();
+    let history = props.history.as_ref().unwrap_or(&empty_history);
 
     let step = if let Some(selected) = *selected {
-        props.history.iter().find(|&step| step.0 == selected)
+        history.iter().find(|&step| step.0 == selected)
     } else {
-        let front = props.history.front();
+        let front = history.front();
         if let Some(front) = front {
             if front.1.len() == 0 {
-                props.history.iter().nth(1)
+                history.iter().nth(1)
             } else {
                 Some(front)
             }
