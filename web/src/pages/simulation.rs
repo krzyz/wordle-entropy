@@ -39,6 +39,7 @@ enum SimulationStateAction {
     Initialize(usize, Vec<usize>, Rc<WordSet>),
     NextStep {
         next_word: Option<usize>,
+        ended: bool,
         guess: usize,
         hints: usize,
         uncertainty: f64,
@@ -56,6 +57,7 @@ struct SimulationState {
     history_small: Vec<(usize, usize)>,
     words_left: Vec<usize>,
     word_set: Option<Rc<WordSet>>,
+    running: bool,
 }
 
 impl Reducible for SimulationState {
@@ -72,9 +74,11 @@ impl Reducible for SimulationState {
                 history_small: vec![],
                 words_left,
                 word_set: Some(word_set),
+                running: true,
             }),
             SimulationStateAction::NextStep {
                 next_word,
+                ended,
                 guess,
                 hints,
                 uncertainty,
@@ -157,6 +161,8 @@ impl Reducible for SimulationState {
                     self.current_word.clone()
                 };
 
+                let running = !ended;
+
                 Rc::new(Self {
                     current_turns,
                     turns_data,
@@ -165,6 +171,7 @@ impl Reducible for SimulationState {
                     history_small,
                     words_left: words_left,
                     word_set: self.word_set.clone(),
+                    running,
                 })
             }
         }
@@ -231,7 +238,7 @@ pub fn view() -> Html {
                         .unwrap()
                         .0;
 
-                    let next_word = if answers.len() > 1 {
+                    let (next_word, ended) = if answers.len() > 1 {
                         match send_queue.try_borrow_mut() {
                             Ok(ref mut send_queue) => {
                                 **send_queue = Some(SimulationInput::Continue {
@@ -241,7 +248,7 @@ pub fn view() -> Html {
                             }
                             _ => log::error!("Unable to borrow in worker callback 1"),
                         }
-                        None
+                        (None, false)
                     } else {
                         if words_left.borrow().len() > 0 {
                             let next_word = &words_left.borrow()[0];
@@ -254,13 +261,14 @@ pub fn view() -> Html {
                                 }
                                 _ => log::error!("Unable to borrow in worker callback 2"),
                             }
-                            Some(next_word.clone())
+                            (Some(next_word.clone()), false)
                         } else {
-                            None
+                            (None, true)
                         }
                     };
 
                     simulation_state.dispatch(SimulationStateAction::NextStep {
+                        ended,
                         next_word,
                         guess,
                         hints,
@@ -402,7 +410,7 @@ pub fn view() -> Html {
         })
     };
 
-    let running = !simulation_state.words_left.is_empty();
+    let running = simulation_state.running;
     let all_words_len = all_words.borrow().len();
     let progress_value = all_words_len
         - words_left.borrow().len()
