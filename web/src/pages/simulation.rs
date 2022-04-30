@@ -12,6 +12,8 @@ use yew::{
     classes, function_component, html, use_effect_with_deps, use_mut_ref, use_reducer, use_state,
     use_state_eq, Callback, Html, MouseEvent, Reducible, TargetCast,
 };
+use yew_router::history::{History, Location};
+use yew_router::hooks::use_history;
 
 use crate::components::{
     Calibration, SelectWords, SelectedWords, SimulationDetail, SimulationHistory, ToastOption,
@@ -196,8 +198,21 @@ pub fn view() -> Html {
     let send_queue = use_mut_ref(|| -> Option<SimulationInput> { None });
     let words_left = use_mut_ref(|| -> Vec<usize> { vec![] });
     let set_toast = use_atom_setter::<ToastOption>();
-    let active_tab = use_state_eq(|| Tab::History);
     let all_words = use_mut_ref(|| -> Vec<usize> { vec![] });
+
+    let location_tab = use_history().and_then(|history| {
+        Tab::from_str(
+            history
+                .location()
+                .hash()
+                .chars()
+                .skip(1)
+                .collect::<String>()
+                .as_str(),
+        )
+        .ok()
+    });
+    let active_tab = use_state_eq(|| location_tab.unwrap_or(Tab::History));
 
     *words_left.borrow_mut() = simulation_state.words_left.clone();
 
