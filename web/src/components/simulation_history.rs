@@ -49,11 +49,11 @@ pub fn view(props: &Props) -> Html {
                     html! { <Plot<(usize, f64), ExpectedTurnsPlotter> {data} {plotter} />}
                 }}
             </div>
-            <div class="column col-6 col-xl-12">
+            <div class="history column col-6 col-xl-12">
             {
                 props.history.iter().map(|row| {
                     html! {
-                        <p>
+                        <p class="history">
                             {
                                 row.1.iter().map(|GuessStep { guess, hints, .. }| {
                                     let word = props.word_set.dictionary.words[*guess].clone();

@@ -3,10 +3,9 @@ use std::rc::Rc;
 use bounce::{use_atom_setter, use_slice_dispatch};
 use web_sys::{HtmlElement, HtmlInputElement};
 use yew::{
-    classes, events::Event, function_component, html, use_effect_with_deps, use_state, Callback,
-    Html, Reducible, TargetCast,
+    classes, function_component, html, use_effect_with_deps, Callback, Html, Reducible, TargetCast,
 };
-use yew::{use_reducer, MouseEvent};
+use yew::{use_reducer, use_state_eq, InputEvent, MouseEvent};
 
 use crate::components::{Plot, ToastOption, ToastType};
 use crate::plots::EntropiesPlotter;
@@ -103,7 +102,28 @@ pub fn view() -> Html {
     let word_set = Rc::new(get_current_word_set());
 
     let dispatch_word_sets = use_slice_dispatch::<WordSetVec>();
-    let selected_state = use_reducer::<EntropyState, _>(|| EntropyState::empty(false));
+    let defaults = word_set
+        .as_ref()
+        .entropies
+        .as_ref()
+        .and_then(|entropies| entropies.iter().next())
+        .map(|(i, entropies_data, _)| {
+            (
+                *i,
+                entropies_data
+                    .probabilities
+                    .iter()
+                    .copied()
+                    .collect::<Vec<_>>(),
+            )
+        });
+    let selected_state = use_reducer::<EntropyState, _>(|| {
+        if let Some((default_selected, default_data)) = defaults {
+            EntropyState::new(default_selected, default_data, false, false)
+        } else {
+            EntropyState::empty(false)
+        }
+    });
     let set_toast = use_atom_setter::<ToastOption>();
 
     let cb = {
@@ -185,14 +205,23 @@ pub fn view() -> Html {
         })
     };
 
-    let max_words_shown = use_state(|| 10);
-    let on_max_words_shown_change = {
+    let max_words_shown = use_state_eq(|| 10);
+    let on_max_words_shown_input = {
         let max_words_shown = max_words_shown.clone();
-        Callback::from(move |e: Event| {
+        Callback::from(move |e: InputEvent| {
             let input: HtmlInputElement = e.target_unchecked_into();
             if let Some(new_num) = input.value().parse::<usize>().ok() {
                 max_words_shown.set(new_num);
             }
+        })
+    };
+
+    let filter = use_state_eq(|| String::new());
+    let on_filter_input = {
+        let filter = filter.clone();
+        Callback::from(move |e: InputEvent| {
+            let input: HtmlInputElement = e.target_unchecked_into();
+            filter.set(input.value());
         })
     };
 
@@ -220,8 +249,14 @@ pub fn view() -> Html {
                     <Plot<f64, EntropiesPlotter> {data} plotter={EntropiesPlotter{}} />
                 </div>
                 <div class="column col-4 col-xl-12">
-                    <label for="max_words_shown_input">{"Max words shown:"}</label>
-                    <input id="max_words_shown_input" onchange={on_max_words_shown_change} value={(*max_words_shown).to_string()}/>
+                    <div class="form-group">
+                        <label class="form-label form-inline" for="max_words_shown_input">{"Max words shown:"}</label>
+                        <input class="form-input form-inline" id="max_words_shown_input" oninput={on_max_words_shown_input} value={(*max_words_shown).to_string()}/>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label form-inline" for="filter_input">{"Filter:"}</label>
+                        <input class="form-input form-inline" id="filter_input" oninput={on_filter_input}/>
+                    </div>
                     <div class="words_entropies_list">
                         <table class="table" onclick={onclick_word}>
                             <thead>
@@ -236,23 +271,31 @@ pub fn view() -> Html {
                             {
                                 if let Some(ref entropies) = word_set.entropies {
                                     entropies
-                                        .iter().take(*max_words_shown).map(|(word, entropy_data, left_turns)| {
+                                        .iter()
+                                        .filter_map(|(word, entropy_data, left_turns)| {
                                             let entropy = &entropy_data.entropy;
-                                            html! {
-                                                <tr
-                                                    key={word.to_string()}
-                                                    class={classes!(
-                                                        "c-hand",
-                                                        (selected_word_val).clone().map(|selected_word| { *word == selected_word }).map(|is_selected| is_selected.then(|| Some("text-primary")))
-                                                    )}
-                                                >
-                                                    <td data-word={word.to_string()}> { &word_set.dictionary.words[*word] }</td>
-                                                    <td data-word={word.to_string()}> { format!("{entropy:.3}") } </td>
-                                                    <td data-word={word.to_string()}> { format!("{left_turns:.3}") } </td>
-                                                    <td data-word={word.to_string()}> { format!("{:.3}", &word_set.dictionary.probabilities[*word]) } </td>
-                                                </tr>
+                                            let word_str = &word_set.dictionary.words[*word].to_string();
+                                            if word_str.contains(&*filter) {
+                                                Some(html! {
+                                                    <tr
+                                                        key={word.to_string()}
+                                                        class={classes!(
+                                                            "c-hand",
+                                                            (selected_word_val).clone().map(|selected_word| { *word == selected_word }).map(|is_selected| is_selected.then(|| Some("text-primary")))
+                                                        )}
+                                                    >
+                                                        <td data-word={word.to_string()}> { word_str }</td>
+                                                        <td data-word={word.to_string()}> { format!("{entropy:.3}") } </td>
+                                                        <td data-word={word.to_string()}> { format!("{left_turns:.3}") } </td>
+                                                        <td data-word={word.to_string()}> { format!("{:.3}", &word_set.dictionary.probabilities[*word]) } </td>
+                                                    </tr>
+                                                })
+                                            } else {
+                                                None
                                             }
-                                        }).collect::<Html>()
+                                        })
+                                        .take(*max_words_shown)
+                                        .collect::<Html>()
                                 } else {
                                     html! {<> </>}
                                 }

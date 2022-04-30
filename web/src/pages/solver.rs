@@ -9,7 +9,7 @@ use wordle_entropy_core::algo::get_valid_hints;
 use wordle_entropy_core::structs::hints::{Hint, ValidHints};
 use wordle_entropy_core::structs::HintsN;
 use yew::{
-    classes, function_component, html, use_effect_with_deps, use_reducer, Callback, Event,
+    classes, function_component, html, use_effect_with_deps, use_reducer, Callback, InputEvent,
     MouseEvent, Reducible, TargetCast,
 };
 use yew_router::history::History;
@@ -275,12 +275,12 @@ pub fn view() -> Html {
         })
     };
 
-    let onchange_input = {
+    let oninput = {
         let word_state = word_state.clone();
         let word_set = word_set.clone();
         let solver_state = solver_state.clone();
 
-        Callback::from(move |e: Event| {
+        Callback::from(move |e: InputEvent| {
             let input: HtmlInputElement = e.target_unchecked_into();
             word_state.dispatch(WordStateAction::NewWord(
                 input.value().clone(),
@@ -353,7 +353,7 @@ pub fn view() -> Html {
                             <label class="form-label">
                             { "Next guess" }
                             </label>
-                            <input type="text" placeholder={word_state.word.to_string()} onchange={onchange_input} />
+                            <input type="text" placeholder={word_state.word.to_string()} {oninput} />
                             if let Some(ref err) = word_state.error{
                                 <p class="form-input-hint">{ err }</p>
                             }

@@ -4,8 +4,8 @@ use anyhow::{anyhow, Error, Result};
 use web_sys::HtmlInputElement;
 use wordle_entropy_core::structs::WordError;
 use yew::{
-    classes, function_component, html, use_mut_ref, use_state, Callback, Event, Properties,
-    TargetCast,
+    classes, function_component, html, use_mut_ref, use_state, Callback, Event, InputEvent,
+    Properties, TargetCast,
 };
 
 use crate::Dictionary;
@@ -61,13 +61,13 @@ pub fn view(props: &Props) -> Html {
     let custom_words_err = use_state(|| -> Option<Error> { None });
     let selected = use_state(|| SelectedWords::Random(*num_random.borrow()));
 
-    let on_num_random_change = {
+    let on_num_random_input = {
         let num_random = num_random.clone();
         let num_random_err = num_random_err.clone();
         let selected = selected.clone();
         let on_words_set = props.on_words_set.clone();
         let max_words = props.dictionary.words.len();
-        Callback::from(move |e: Event| {
+        Callback::from(move |e: InputEvent| {
             let input: HtmlInputElement = e.target_unchecked_into();
             match input
                 .value()
@@ -92,13 +92,13 @@ pub fn view(props: &Props) -> Html {
         })
     };
 
-    let on_word_list_change = {
+    let on_word_list_input = {
         let custom_words = custom_words.clone();
         let custom_words_err = custom_words_err.clone();
         let selected = selected.clone();
         let on_words_set = props.on_words_set.clone();
         let dictionary = props.dictionary.clone();
-        Callback::from(move |e: Event| {
+        Callback::from(move |e: InputEvent| {
             let input: HtmlInputElement = e.target_unchecked_into();
             match parse_custom_words(&input.value(), &*dictionary) {
                 Ok(words) => {
@@ -165,7 +165,7 @@ pub fn view(props: &Props) -> Html {
                 if let SelectedWords::Random(_) = *selected {
                     html! {
                         <div class={classes!("form-group", num_random_err.as_ref().map(|_| "has-error"))}>
-                            <input class="form-input form-inline" type="text" placeholder="10" onchange={on_num_random_change}/>
+                            <input class="form-input form-inline" type="text" placeholder="10" oninput={on_num_random_input}/>
                             if let Some(ref err) = *num_random_err {
                                 <p class="form-input-hint">{ err }</p>
                             }
@@ -178,7 +178,7 @@ pub fn view(props: &Props) -> Html {
                                 class="form-input form-inline"
                                 id="word_list_textarea"
                                 placeholder="Word1,Word2,Word3"
-                                onchange={on_word_list_change}
+                                oninput={on_word_list_input}
                             />
                             if let Some(ref err) = *custom_words_err {
                                 <p class="form-input-hint">{ err }</p>
