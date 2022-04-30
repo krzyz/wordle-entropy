@@ -390,7 +390,11 @@ pub fn view() -> Html {
                 } else {
                     html! {
                         <div onclick={onclick_suggestion} >
-                            <SimulationDetail word_set={word_set.clone()} init_scores={init_scores} history={history} />
+                            <SimulationDetail
+                                word_set={word_set.clone()}
+                                init_scores={init_scores}
+                                history={history}
+                                suggestions_clickable={true} />
                         </div>
                     }
                 }

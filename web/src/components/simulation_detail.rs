@@ -3,7 +3,11 @@ use std::{collections::VecDeque, rc::Rc};
 
 use either::Either;
 use itertools::Itertools;
-use yew::{function_component, html, use_state_eq, Html, Properties};
+use web_sys::HtmlElement;
+use yew::{
+    classes, function_component, html, use_effect_with_deps, use_state_eq, Callback, Html,
+    MouseEvent, Properties, TargetCast,
+};
 
 use crate::components::HintedWord;
 use crate::{pages::GuessStep, word_set::WordSet};
@@ -41,7 +45,7 @@ pub fn render_suggestions(
             .collect::<Html>();
 
             html! {
-                <tr class="c-hand">
+                <tr>
                     { row }
                 </tr>
             }
@@ -56,16 +60,31 @@ pub struct Props {
     #[prop_or_default]
     pub init_scores: Option<Vec<(usize, f64, f64)>>,
     pub word_set: Rc<WordSet>,
+    #[prop_or_default]
+    pub suggestions_clickable: bool,
 }
 
 #[function_component(SimulationDetail)]
 pub fn view(props: &Props) -> Html {
-    let selected = use_state_eq(|| -> Option<usize> { None });
+    let selected_word = use_state_eq(|| -> Option<usize> { None });
+    let selected_step = use_state_eq(|| -> Option<usize> { None });
     let word_set = props.word_set.clone();
     let empty_history = VecDeque::default();
     let history = props.history.as_ref().unwrap_or(&empty_history);
 
-    let step = if let Some(selected) = *selected {
+    {
+        let selected_step = selected_step.clone();
+
+        use_effect_with_deps(
+            move |_| {
+                selected_step.set(None);
+                || ()
+            },
+            props.history.clone(), // dependents
+        );
+    }
+
+    let step = if let Some(selected) = *selected_word {
         history.iter().find(|&step| step.0 == selected)
     } else {
         let front = history.front();
@@ -80,6 +99,23 @@ pub fn view(props: &Props) -> Html {
         }
     };
 
+    let onclick_step = {
+        let selected_step = selected_step.clone();
+
+        Callback::from(move |e: MouseEvent| {
+            let element: HtmlElement = e.target_unchecked_into();
+            if let Some(step) = element
+                .dataset()
+                .get("step")
+                .and_then(|x| x.parse::<usize>().ok())
+            {
+                selected_step.set(Some(step));
+            }
+        })
+    };
+
+    let c_suggestions_clickable = props.suggestions_clickable.then(|| "c-hand".to_string());
+
     html! {
         <div class="container">
             <div class="columns">
@@ -92,14 +128,16 @@ pub fn view(props: &Props) -> Html {
                                 <th> { "Uncertainty" } </th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody class="c-hand" onclick={onclick_step}>
                         {
                             if let Some(step) = step {
-                                step.1.iter().map(|GuessStep {uncertainty, ref answers, .. }| {
+                                step.1.iter().enumerate().map(|(i, GuessStep {uncertainty, ref answers, .. })| {
+                                    let c_selected = selected_step.filter(|&selected_i| selected_i == i).map(|_| "selected".to_string());
+
                                     html! {
-                                        <tr>
-                                            <td> { format!("{} Pos", answers.len()) } </td>
-                                            <td> { format!("{uncertainty:.2} bits") } </td>
+                                        <tr class={classes![c_selected]}>
+                                            <td data-step={i.to_string()}> { format!("{} Pos", answers.len()) } </td>
+                                            <td data-step={i.to_string()}> { format!("{uncertainty:.2} bits") } </td>
                                         </tr>
                                     }
                                 }).collect::<Html>()
@@ -152,11 +190,13 @@ pub fn view(props: &Props) -> Html {
                         <tbody>
                         {
                             if let Some(step) = step {
-                                step.1.iter().map(|&GuessStep { guess, hints, .. }| {
+                                step.1.iter().enumerate().map(|(i, &GuessStep { guess, hints, .. })| {
+                                    let c_selected = selected_step.filter(|&selected_i| selected_i == i).map(|_| "selected".to_string());
+
                                     let word = &word_set.dictionary.words[guess];
                                     let hints = &word_set.dictionary.hints[hints];
                                     html! {
-                                        <tr>
+                                        <tr class={classes![c_selected]}>
                                             <td>
                                                 <HintedWord word={word.clone()} hints={hints.clone()} />
                                             </td>
@@ -179,22 +219,29 @@ pub fn view(props: &Props) -> Html {
                                 <th> { "E[Turns]" } </th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody class={classes![c_suggestions_clickable]}>
                         {
                             if let Some(step) = step {{{
-                                let (last_useful_info, ended) =
-                                    if let Some((last, second_to_last)) = step.1.iter().rev().next_tuple() {
+
+                                let (info, num_answers_before) =
+                                    if let Some(selected_step) = *selected_step {
+                                        let info = step.1.iter().nth(selected_step);
+                                        let last = selected_step + 1 == step.1.len();
+                                        let ended = step.1.last().filter(|x| x.answers.len() == 1).is_some();
+                                        let num_answers_before = selected_step +
+                                            if last && ended { 0 } else { 1 };
+                                        (info, num_answers_before)
+                                    } else if let Some((last, second_to_last)) = step.1.iter().rev().next_tuple() {
                                         if last.answers.len() == 1 {
-                                            (Some(second_to_last), true)
+                                            (Some(second_to_last), step.1.len() - 1)
                                         } else {
-                                            (Some(last), false)
+                                            (Some(last), step.1.len())
                                         }
                                     } else {
-                                        (step.1.iter().last(), false)
+                                        (step.1.iter().last(), step.1.len())
                                     };
 
-                                if let Some(GuessStep { ref answers, ref scores, .. }) = last_useful_info {{{
-                                    let num_answers_before = step.1.len() - if ended { 1 } else { 0 };
+                                if let Some(GuessStep { ref answers, ref scores, .. }) = info {{{
                                     render_suggestions(scores, answers, word_set.as_ref(), num_answers_before)
                                 }}} else {
                                     html! {}

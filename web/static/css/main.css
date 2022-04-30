@@ -23,6 +23,11 @@ table.centered {
   margin: 0 auto;
 }
 
+tr.selected {
+  outline: solid thin;
+  outline-color: rgb(218, 68, 68);
+}
+
 .fill-space {
   max-height: 800px;
   width: 100%;
