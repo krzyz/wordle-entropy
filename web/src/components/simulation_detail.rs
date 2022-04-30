@@ -82,8 +82,8 @@ pub fn view(props: &Props) -> Html {
         <div class="container">
             <div class="columns">
                 <div class="column col-2 col-xl-1 col-md-12" />
-                <div class="column col-3 col-md-4 col-xs-12">
-                    <table>
+                <div class="column col-3 col-md-4 col-sm-12 text-center">
+                    <table class="centered">
                         <thead>
                             <tr>
                                 <th> { "# Possibilities" } </th>
@@ -127,8 +127,8 @@ pub fn view(props: &Props) -> Html {
                     }
                     </ul>
                 </div>
-                <div class="column col-2 col-md-4 col-xs-8 col-mx-auto">
-                    <table>
+                <div class="column col-2 col-xl-4 col-sm-10 col-mx-auto text-center">
+                    <table class="centered">
                         <thead>
                             <tr>
                                 <th> { "Hints so far" } </th>
@@ -155,8 +155,8 @@ pub fn view(props: &Props) -> Html {
                         </tbody>
                     </table>
                 </div>
-                <div class="column col-3 col-md-4 col-xs-12">
-                    <table>
+                <div class="column col-3 col-md-4 col-sm-12 text-center">
+                    <table class="centered">
                         <thead>
                             <tr>
                                 <th> { "Top picks" } </th>

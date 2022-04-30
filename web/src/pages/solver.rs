@@ -346,9 +346,9 @@ pub fn view() -> Html {
 
     html! {
         <section>
-            <div class="container">
+            <div class="container pb-2">
                 <div class="columns">
-                    <div class="column col-2 col-md-4 col-xs-8 col-mx-auto">
+                    <div class="column col-2 col-xl-4 col-sm-6 col-xs-8 col-mx-auto text-center">
                         <div class={classes!("form-group", word_state.error.as_ref().map(|_| "has-error"))}>
                             <label class="form-label">
                             { "Next guess" }
@@ -382,7 +382,11 @@ pub fn view() -> Html {
                 };
 
                 if let (None, None) = (history.as_ref(), init_scores.as_ref()) {
-                    html! {r#" No word entropies available. Please ensure a word set is loaded and click "Run" on the "Entropy Calculation" page"#}
+                    html! {
+                        <div class="text-center">
+                            { r#" No word entropies available. Please ensure a word set is loaded and click "Run" on the "Entropy Calculation" page"# }
+                        </div>
+                    }
                 } else {
                     html! {
                         <div onclick={onclick_suggestion} >

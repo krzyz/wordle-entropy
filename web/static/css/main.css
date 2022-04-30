@@ -19,6 +19,10 @@ ul.words_left_list {
   overflow-y: scroll;
 }
 
+table.centered {
+  margin: 0 auto;
+}
+
 .fill-space {
   max-height: 800px;
   width: 100%;
