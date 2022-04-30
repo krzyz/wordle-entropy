@@ -42,6 +42,7 @@ num = "0.4.0"
 gloo-events = "0.1.1"
 gloo-utils = "0.1.2"
 itertools = "0.10.3"
+either = "1.6.1"
 
 [dependencies.web-sys]
 version = "0.3.56"

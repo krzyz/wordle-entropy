@@ -1,5 +1,7 @@
+use std::iter;
 use std::{collections::VecDeque, rc::Rc};
 
+use either::Either;
 use itertools::Itertools;
 use yew::{function_component, html, use_state_eq, Html, Properties};
 
@@ -111,11 +113,24 @@ pub fn view(props: &Props) -> Html {
                     {
                         if let Some(step) = step {
                             if let Some(GuessStep { ref answers, .. }) = step.1.iter().last() {
-                                answers.iter().map(|&answer| {
-                                    let probability = word_set.dictionary.probabilities[answer];
-                                    let answer = &word_set.dictionary.words[answer];
-                                    html! {
-                                        <li> { format!("{answer}, {probability:.3}") }  </li>
+                                let answers_opt_iter = answers.iter().map(|x| Some(x));
+                                let answers_opt_iter = if answers.len() > 10 {
+                                    Either::Right(answers_opt_iter.clone().take(5).chain(iter::once(None)).chain(answers_opt_iter.rev().take(5).rev()))
+                                } else {
+                                    Either::Left(answers_opt_iter)
+                                };
+
+                                answers_opt_iter.map(|answer| {
+                                    if let Some(&answer) = answer {
+                                        let probability = word_set.dictionary.probabilities[answer];
+                                        let answer = &word_set.dictionary.words[answer];
+                                        html! {
+                                            <li> { format!("{answer}, {probability:.3}") }  </li>
+                                        }
+                                    } else {
+                                        html! {
+                                            <li> { format!("⋮") }  </li>
+                                        }
                                     }
                                 }).collect::<Html>()
                             } else {
