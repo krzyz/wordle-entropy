@@ -81,7 +81,7 @@ pub fn word_set_select() -> Html {
     }
 
     html! {
-        <select name="word_sets" {onchange}>
+        <select class="form-select" name="word_sets" {onchange}>
             {
                 word_sets.0.iter().map(|word_set| {
                     let name = word_set.name.clone();

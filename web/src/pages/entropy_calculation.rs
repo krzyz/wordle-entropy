@@ -208,7 +208,7 @@ pub fn view() -> Html {
                     <button class="btn btn-primary" disabled={running || !ready} onclick={onclick_run}>{"Run"}</button>
                     {
                         if running {
-                            html!(<div class="d-inline-block loading p-2"></div>)
+                            html!(<div class="d-inline-block loading ml-2"></div>)
                         } else {
                             html!()
                         }

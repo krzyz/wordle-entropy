@@ -147,7 +147,7 @@ pub fn view(props: &Props) -> Html {
                         }
                         </tbody>
                     </table>
-                    <ul>
+                    <table class="centered">
                     {
                         if let Some(step) = step {
                             if let Some(GuessStep { ref answers, .. }) = step.1.iter().last() {
@@ -163,11 +163,20 @@ pub fn view(props: &Props) -> Html {
                                         let probability = word_set.dictionary.probabilities[answer];
                                         let answer = &word_set.dictionary.words[answer];
                                         html! {
-                                            <li> { format!("{answer}, {probability:.3}") }  </li>
+                                            <tr>
+                                                <td> { format!("{answer}") } </td>
+                                                <td>
+                                                    <span class="d-inline-block" style="width: 50px; text-indent: 0px;">
+                                                        <progress class="progress ml-2" style="vertical-align: middle;" value={format!("{probability:3}")} max="1" />
+                                                    </span>
+                                                </td>
+                                            </tr>
                                         }
                                     } else {
                                         html! {
-                                            <li> { format!("⋮") }  </li>
+                                            <tr>
+                                                <td colspan="2"> { format!("⋮") } </td>
+                                            </tr>
                                         }
                                     }
                                 }).collect::<Html>()
@@ -178,7 +187,7 @@ pub fn view(props: &Props) -> Html {
                             html! {}
                         }
                     }
-                    </ul>
+                    </table>
                 </div>
                 <div class="column col-2 col-xl-4 col-sm-10 col-mx-auto text-center">
                     <table class="centered">

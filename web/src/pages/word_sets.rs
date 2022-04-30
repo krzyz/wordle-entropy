@@ -93,11 +93,29 @@ pub fn form() -> Html {
     };
 
     html! {
-        <form onsubmit={onload}>
-            <label for="name_input">{ "Name" }</label>
-            <input id="name_input" ref={name_input_node_ref} />
-            <input class="btn" ref={file_input_node_ref} type="file"/>
-            <button class="btn btn-primary">{"Add new words"}</button>
+        <form class="form-horizontal" onsubmit={onload}>
+            <div class="form-group">
+                <div class="col-3">
+                    <label class="form-label" for="name_input">{ "Name" }</label>
+                </div>
+                <div class="col-9">
+                    <input id="name_input" class="form-input" ref={name_input_node_ref} />
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="col-3">
+                    <label class="form-label" for="name_input">{ "File" }</label>
+                </div>
+                <div class="col-9">
+                    <input class="form-input" ref={file_input_node_ref} type="file"/>
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="col-8" />
+                <div class="col-4">
+                    <button class="btn btn-primary">{"Add new words"}</button>
+                </div>
+            </div>
         </form>
     }
 }
@@ -188,7 +206,13 @@ pub fn view() -> Html {
                     }
                 </tbody>
             </table>
-            <AddWordSetForm />
+            <div class="columns">
+                <div class="column col-4 col-xl-3 col-lg-2 col-md-0" />
+                <div class="column col-mx text-center">
+                    <AddWordSetForm />
+                </div>
+                <div class="column col-4 col-xl-3 col-lg-2 col-md-0" />
+            </div>
 
         </container>
     }
