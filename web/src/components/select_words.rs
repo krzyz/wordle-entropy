@@ -59,7 +59,7 @@ pub fn view(props: &Props) -> Html {
     let custom_words = use_mut_ref(|| -> Vec<usize> { vec![] });
     let num_random_err = use_state(|| -> Option<Error> { None });
     let custom_words_err = use_state(|| -> Option<Error> { None });
-    let selected = use_mut_ref(|| SelectedWords::Random(*num_random.borrow()));
+    let selected = use_state(|| SelectedWords::Random(*num_random.borrow()));
 
     let on_num_random_change = {
         let num_random = num_random.clone();
@@ -81,10 +81,9 @@ pub fn view(props: &Props) -> Html {
                     }
                 }) {
                 Ok(value) => {
-                    if let SelectedWords::Random(ref mut num_random) = *selected.borrow_mut() {
-                        *num_random = value
-                    }
-                    on_words_set.emit((*selected.borrow()).clone());
+                    let new_selected = SelectedWords::Random(value);
+                    selected.set(new_selected.clone());
+                    on_words_set.emit(new_selected);
                     *num_random.borrow_mut() = value;
                     num_random_err.set(None);
                 }
@@ -103,10 +102,9 @@ pub fn view(props: &Props) -> Html {
             let input: HtmlInputElement = e.target_unchecked_into();
             match parse_custom_words(&input.value(), &*dictionary) {
                 Ok(words) => {
-                    if let SelectedWords::Custom(ref mut custom_words) = *selected.borrow_mut() {
-                        *custom_words = words.clone()
-                    }
-                    on_words_set.emit((*selected.borrow()).clone());
+                    let new_selected = SelectedWords::Custom(words.clone());
+                    selected.set(new_selected.clone());
+                    on_words_set.emit(new_selected);
                     *custom_words.borrow_mut() = words;
                     custom_words_err.set(None);
                 }
@@ -120,8 +118,9 @@ pub fn view(props: &Props) -> Html {
         let selected = selected.clone();
         let on_words_set = props.on_words_set.clone();
         Callback::from(move |_: Event| {
-            *selected.borrow_mut() = SelectedWords::Random(*num_random.borrow());
-            on_words_set.emit((*selected.borrow()).clone());
+            let new_selected = SelectedWords::Random(*num_random.borrow());
+            selected.set(new_selected.clone());
+            on_words_set.emit(new_selected);
         })
     };
 
@@ -130,54 +129,64 @@ pub fn view(props: &Props) -> Html {
         let selected = selected.clone();
         let on_words_set = props.on_words_set.clone();
         Callback::from(move |_: Event| {
-            *selected.borrow_mut() = SelectedWords::Custom((*custom_words.borrow()).clone());
-            on_words_set.emit((*selected.borrow()).clone());
+            let new_selected = SelectedWords::Custom((*custom_words.borrow()).clone());
+            selected.set(new_selected.clone());
+            on_words_set.emit(new_selected);
         })
     };
 
-    let selected = &*selected.borrow();
-
     html! {
         <>
-            <div class={classes!("form-group", num_random_err.as_ref().map(|_| "has-error"))}>
-                <label class="form-radio form-inline">
+            <div class="form-group">
+                <label class="form-radio form-inline pr-2">
                     <input
                         type="radio"
                         name="select-word-type"
                         value="random"
-                        checked={matches!(selected, SelectedWords::Random(_))}
+                        checked={matches!(*selected, SelectedWords::Random(_))}
                         onchange={on_num_random_radio_change}
                     />
                     <i class="form-icon" />
                     { "Random: " }
                 </label>
-                <input class="form-input form-inline" type="text" placeholder="10" onchange={on_num_random_change}/>
-                if let Some(ref err) = *num_random_err {
-                    <p class="form-input-hint">{ err }</p>
-                }
-            </div>
-            <div class={classes!("form-group", custom_words_err.as_ref().map(|_| "has-error"))}>
-                <label class="form-radio">
+                <label class="form-radio form-inline">
                     <input
                         type="radio"
                         name="select-word-type"
                         value="custom"
-                        checked={matches!(selected, SelectedWords::Custom(_))}
+                        checked={matches!(*selected, SelectedWords::Custom(_))}
                         onchange={on_custom_words_radio_change}
                     />
                     <i class="form-icon" />
                     { "Custom set:" }
                 </label>
-                <textarea
-                    class="form-input form-inline"
-                    id="word_list_textarea"
-                    placeholder="Word1,Word2,Word3"
-                    onchange={on_word_list_change}
-                />
-                if let Some(ref err) = *custom_words_err {
-                    <p class="form-input-hint">{ err }</p>
-                }
             </div>
+            {
+                if let SelectedWords::Random(_) = *selected {
+                    html! {
+                        <div class={classes!("form-group", num_random_err.as_ref().map(|_| "has-error"))}>
+                            <input class="form-input form-inline" type="text" placeholder="10" onchange={on_num_random_change}/>
+                            if let Some(ref err) = *num_random_err {
+                                <p class="form-input-hint">{ err }</p>
+                            }
+                        </div>
+                    }
+                } else {
+                    html! {
+                        <div class={classes!("form-group", custom_words_err.as_ref().map(|_| "has-error"))}>
+                            <textarea
+                                class="form-input form-inline"
+                                id="word_list_textarea"
+                                placeholder="Word1,Word2,Word3"
+                                onchange={on_word_list_change}
+                            />
+                            if let Some(ref err) = *custom_words_err {
+                                <p class="form-input-hint">{ err }</p>
+                            }
+                        </div>
+                    }
+                }
+            }
         </>
     }
 }

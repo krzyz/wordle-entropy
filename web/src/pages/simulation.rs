@@ -35,6 +35,7 @@ pub struct GuessStep {
 }
 
 enum SimulationStateAction {
+    Reset,
     Initialize(usize, Vec<usize>, Rc<WordSet>),
     NextStep {
         next_word: Option<usize>,
@@ -62,6 +63,7 @@ impl Reducible for SimulationState {
 
     fn reduce(self: Rc<Self>, action: Self::Action) -> Rc<Self> {
         match action {
+            SimulationStateAction::Reset => Rc::new(Self::default()),
             SimulationStateAction::Initialize(word, words_left, word_set) => Rc::new(Self {
                 current_turns: vec![],
                 turns_data: vec![],
@@ -85,11 +87,15 @@ impl Reducible for SimulationState {
                 let mut history = self.history.clone();
                 let mut history_small = self.history_small.clone();
 
+                if let None = self.current_word {
+                    return self.clone();
+                }
+
                 let mut last_optn: Option<&mut (usize, Vec<GuessStep>)>;
                 let history_front = if let Some(history_front) = history.front_mut() {
                     history_front
                 } else {
-                    history.push_front((self.current_word.unwrap(), vec![]));
+                    history.push_front((self.current_word.unwrap_or(0), vec![]));
                     last_optn = history.front_mut();
                     &mut **last_optn.as_mut().unwrap()
                 };
@@ -143,7 +149,9 @@ impl Reducible for SimulationState {
                     if history.len() > 10 {
                         history.pop_back();
                     }
-                    history.push_front((self.current_word.unwrap(), vec![]));
+                    if let Some(current_word) = self.current_word {
+                        history.push_front((current_word, vec![]));
+                    }
                     next_word
                 } else {
                     self.current_word.clone()
@@ -263,14 +271,20 @@ pub fn view() -> Html {
                 }
                 SimulationOutput::Stopped => todo!(),
             },
-            WordleWorkerOutput::Err(err) => set_toast(ToastOption::new(
-                format!("Worker error: {err}").to_string(),
-                ToastType::Error,
-            )),
-            _ => set_toast(ToastOption::new(
-                "Unexpected worker output".to_string(),
-                ToastType::Error,
-            )),
+            WordleWorkerOutput::Err(err) => {
+                simulation_state.dispatch(SimulationStateAction::Reset);
+                set_toast(ToastOption::new(
+                    format!("Worker error: {err}").to_string(),
+                    ToastType::Error,
+                ))
+            }
+            _ => {
+                simulation_state.dispatch(SimulationStateAction::Reset);
+                set_toast(ToastOption::new(
+                    "Unexpected worker output".to_string(),
+                    ToastType::Error,
+                ))
+            }
         }
     };
 
@@ -311,6 +325,7 @@ pub fn view() -> Html {
         let simulation_state = simulation_state.clone();
         let word_set = word_set.clone();
         let all_words = all_words.clone();
+        let set_toast = set_toast.clone();
 
         Callback::from(move |_| {
             *stepping.borrow_mut() = false;
@@ -339,6 +354,12 @@ pub fn view() -> Html {
                         correct: word,
                         guess: None,
                     },
+                ));
+            } else {
+                simulation_state.dispatch(SimulationStateAction::Reset);
+                set_toast(ToastOption::new(
+                    "No words selected".to_string(),
+                    ToastType::Error,
                 ));
             }
         })
@@ -393,21 +414,25 @@ pub fn view() -> Html {
 
     html! {
         <section>
-            <SelectWords dictionary={word_set.dictionary.clone()} {on_words_set} />
-            <button
-                class="btn btn-primary"
-                onclick={on_start_button_click}
-            >{ "Start" }</button>
-            <button
-                class="btn btn-primary"
-                onclick={on_continue_button_click}
-                disabled={!*stepping.borrow() || !running}
-            > { "Continue" }</button>
-            <button
-                class="btn btn-primary"
-                onclick={on_step_button_click}
-                disabled={!running}
-            >{ "Step" }</button>
+            <div class="columns">
+                <div class="column col-2 col-xl-8 col-sm-12 col-mx-auto text-center">
+                    <SelectWords dictionary={word_set.dictionary.clone()} {on_words_set} />
+                    <button
+                        class="btn btn-primary"
+                        onclick={on_start_button_click}
+                    >{ "Start" }</button>
+                    <button
+                        class="btn btn-primary"
+                        onclick={on_continue_button_click}
+                        disabled={!*stepping.borrow() || !running}
+                    > { "Continue" }</button>
+                    <button
+                        class="btn btn-primary"
+                        onclick={on_step_button_click}
+                        disabled={!running}
+                    >{ "Step" }</button>
+                </div>
+            </div>
             <progress class="progress" value={progress_value.to_string()} max={all_words_len.to_string()}/>
             <ul class="tab tab-block" onclick={on_tab_change}>
                 {

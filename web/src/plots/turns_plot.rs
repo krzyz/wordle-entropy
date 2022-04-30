@@ -30,10 +30,9 @@ impl Plotter for TurnsLeftPlotter {
             + self
                 .bar_data
                 .iter()
-                .filter(|&&((_, _), prob)| prob > 0.2)
-                .map(|&((_, left), _)| left)
+                .filter_map(|&((_, left), prob)| (prob > 0.2).then(|| left))
                 .max_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Less))
-                .unwrap_or(7.) as f64;
+                .unwrap_or(5.) as f64;
 
         let x_max = self
             .bar_data
