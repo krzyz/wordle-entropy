@@ -2398,6 +2398,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_cbor",
+ "serde_json",
  "strum",
  "strum_macros",
  "varpro",

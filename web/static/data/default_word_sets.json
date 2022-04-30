@@ -1,0 +1,12 @@
+{
+    "word_sets": [
+        {
+            "name": "Polish words",
+            "dictionary_url": "https://wordle.realcomplexity.com/data/polish_words_with_probs.csv"
+        },
+        {
+            "name": "English words",
+            "dictionary_url": "https://wordle.realcomplexity.com/data/english_words_with_probs.csv"
+        }
+    ]
+}

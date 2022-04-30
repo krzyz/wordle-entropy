@@ -7,28 +7,50 @@ use yew::events::Event;
 use yew::{function_component, html, use_effect, Callback, Html, TargetCast};
 
 use super::toast::{ToastOption, ToastType};
-use crate::word_set::{WordSet, WordSetVec, WordSetVecAction};
+use crate::word_set::{DefaultWordSets, WordSet, WordSetSpec, WordSetVec, WordSetVecAction};
 use crate::WORD_SIZE;
 
 async fn handle_word_set_init(word_sets: UseSliceHandle<WordSetVec>) -> Result<()> {
     let client = reqwest::Client::new();
-    let response = client
-        .get("https://wordle.realcomplexity.com/data/words-scrabble-with_probs.csv")
-        .send()
-        .await?;
+    let default_word_sets_url = "https://wordle.realcomplexity.com/data/default_word_sets.json";
+    let response = client.get(default_word_sets_url).send().await?;
 
     if !response.status().is_success() {
         return Err(anyhow!(
-            "Error loading default word sets, request status: {}",
+            "Error loading default word sets list from url: {default_word_sets_url}, request status: {}",
             response.status()
         ));
     }
 
     let text = response.text().await?;
-    let dictionary = parse_words::<_, WORD_SIZE>(text.lines())?;
-    word_sets.dispatch(WordSetVecAction::Set((*word_sets).extend_with(
-        WordSet::from_dictionary("Polish words scrabble".to_string(), dictionary),
-    )));
+
+    let default_word_sets: DefaultWordSets = serde_json::from_str(&text)?;
+
+    let mut loaded_word_sets = vec![];
+    loaded_word_sets.reserve(default_word_sets.word_sets.len());
+
+    for WordSetSpec {
+        name,
+        dictionary_url,
+    } in default_word_sets.word_sets.into_iter()
+    {
+        let response = client.get(&dictionary_url).send().await?;
+
+        if !response.status().is_success() {
+            return Err(anyhow!(
+                "Error loading word sets named: {name} from url: {dictionary_url}, request status: {}",
+                response.status()
+            ));
+        }
+        let text = response.text().await?;
+
+        let dictionary = parse_words::<_, WORD_SIZE>(text.lines())?;
+        loaded_word_sets.push(WordSet::from_dictionary(name, dictionary));
+    }
+
+    word_sets.dispatch(WordSetVecAction::Set(
+        (*word_sets).extend_with(loaded_word_sets),
+    ));
 
     Ok(())
 }

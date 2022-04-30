@@ -3,6 +3,7 @@ use crate::{Dictionary, EntropiesData};
 use bounce::prelude::*;
 use gloo_storage::{LocalStorage, Storage};
 use serde::{Deserialize, Serialize};
+use std::iter;
 use std::rc::Rc;
 use wordle_entropy_core::calibration::Calibration;
 use yew::Reducible;
@@ -102,9 +103,9 @@ impl Default for WordSetVec {
 }
 
 impl WordSetVec {
-    pub fn extend_with(&self, word_set: WordSet) -> Self {
+    pub fn extend_with(&self, word_sets: impl IntoIterator<Item = WordSet>) -> Self {
         let mut new_vec = self.clone();
-        new_vec.0.push(word_set);
+        new_vec.0.extend(word_sets);
         new_vec
     }
 }
@@ -142,7 +143,7 @@ impl Reducible for WordSetVec {
                     .collect(),
             )),
             WordSetVecAction::LoadWords(name, dictionary) => {
-                Rc::new(self.extend_with(WordSet::from_dictionary(name, dictionary)))
+                Rc::new(self.extend_with(iter::once(WordSet::from_dictionary(name, dictionary))))
             }
             WordSetVecAction::SetEntropy(name, entropies_data) => {
                 let mut new_vec = self.0.clone();
@@ -181,4 +182,15 @@ pub fn get_current_word_set() -> WordSet {
         ));
 
     word_set
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WordSetSpec {
+    pub name: String,
+    pub dictionary_url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DefaultWordSets {
+    pub word_sets: Vec<WordSetSpec>,
 }
