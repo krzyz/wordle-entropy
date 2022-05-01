@@ -14,7 +14,12 @@ pub struct ExpectedTurnsPlotter {
 impl Plotter for ExpectedTurnsPlotter {
     type DataType = (usize, f64);
 
-    fn draw_plot(&self, canvas: HtmlCanvasElement, data: &[(usize, f64)]) -> Result<()> {
+    fn draw_plot(
+        &self,
+        canvas: HtmlCanvasElement,
+        data: &[(usize, f64)],
+        _mouse_coord: Option<(i32, i32)>,
+    ) -> Result<()> {
         let root = CanvasBackend::with_canvas_object(canvas)
             .ok_or(anyhow!("Unable to initialize plot backend from canvas"))?
             .into_drawing_area();

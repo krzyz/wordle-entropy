@@ -21,6 +21,7 @@ impl Plotter for TurnsLeftPlotter {
         &self,
         canvas: HtmlCanvasElement,
         data_with_weights: &[(f64, f64, f64)],
+        _mouse_coord: Option<(i32, i32)>,
     ) -> Result<()> {
         let root = CanvasBackend::with_canvas_object(canvas)
             .ok_or(anyhow!("Unable to initialize plot backend from canvas"))?

@@ -246,7 +246,14 @@ pub fn view() -> Html {
             </div>
             <div class="columns">
                 <div class="column col-8 col-xl-12">
-                    <Plot<f64, EntropiesPlotter> {data} plotter={EntropiesPlotter{}} />
+                {{
+                    let entropies_data = selected_word_val.and_then(|selected_word| word_set.entropies.as_ref()
+                        .and_then(|entropies| entropies.iter().find(|(word, _, _)| word == &selected_word))).map(|(_, entropies_data, _)| entropies_data.clone());
+
+                    html! {
+                        <Plot<f64, EntropiesPlotter> {data} plotter={EntropiesPlotter{ word_set: word_set.clone(), entropies_data }} />
+                    }
+                }}
                 </div>
                 <div class="column col-4 col-xl-12">
                     <div class="form-group">
