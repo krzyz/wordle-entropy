@@ -1,3 +1,5 @@
+use std::env;
+
 use nalgebra::{DVector, Scalar};
 use num::One;
 use num_traits::Float;
@@ -6,14 +8,10 @@ use varpro::prelude::*;
 use varpro::solvers::levmar::{LevMarProblemBuilder, LevMarSolver};
 use we_core::algo;
 use we_core::data;
-use we_core::entropy::calculate_entropies;
-use we_core::solvers::{solve, solve_random};
+use we_core::solvers::solve_random;
 use we_core::structs::{knowledge::KnowledgeN, word::WordN};
 use wordle_entropy_core as we_core;
 
-//const WORDS_PATH: &str = "/home/krzyz/projects/data/words_polish.txt";
-//const WORDS_PATH: &str = "/home/krzyz/projects/data/scrabble-polish-words.txt";
-const WORDS_PATH: &str = "D:/projects/data/words-scrabble-with-probs.csv";
 const WORDS_LENGTH: usize = 5;
 
 type Word = WordN<char, WORDS_LENGTH>;
@@ -61,8 +59,8 @@ fn fit(data: Vec<(f64, f64)>) -> (f64, f64, f64) {
 }
 
 pub fn print_example() {
-    let guess: Word = Word::new("śląsk");
-    let correct: Word = Word::new("oślik");
+    let guess: Word = Word::try_from("śląsk").unwrap();
+    let correct: Word = Word::try_from("oślik").unwrap();
     let knowledge = Knowledge::none();
     let hints = algo::get_hints(&guess, &correct);
     let knowledge = algo::update_knowledge(&guess, &hints, knowledge);
@@ -70,7 +68,7 @@ pub fn print_example() {
     println!("{hints}");
     println!("{knowledge:#?}");
 
-    let guess: Word = Word::new("rolka");
+    let guess: Word = Word::try_from("rolka").unwrap();
     let hints = algo::get_hints(&guess, &correct);
     let knowledge = algo::update_knowledge(&guess, &hints, knowledge);
     println!("{hints}");
@@ -78,16 +76,16 @@ pub fn print_example() {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let dictionary = data::load_words::<_, WORDS_LENGTH>(WORDS_PATH).unwrap();
+    let args: Vec<String> = env::args().collect();
+    if args.len() <= 1 {
+        eprintln!("Missing argument: path to word list");
+        std::process::exit(1);
+    }
+
+    let words_path = &args[1];
+
+    let dictionary = data::load_words::<_, WORDS_LENGTH>(words_path).unwrap();
     let words = &dictionary.words;
-
-    /*
-    let correct = WordN::<char, 5>::new("apage");
-    let answers = (0..words.len()).collect::<Vec<_>>();
-    let initial_entropies = calculate_entropies(&dictionary, &answers);
-
-    let solved = solve(&initial_entropies, &dictionary, &correct, true);
-    */
 
     let unc_data = solve_random(&dictionary, 200)
         .into_iter()
