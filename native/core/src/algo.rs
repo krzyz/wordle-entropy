@@ -127,17 +127,14 @@ pub fn get_valid_hints<const N: usize>(
         .map(|(i, (p, g))| {
             let mut known = known.clone();
 
-            for (_, ((&h, &g), p)) in hints
+            for (_, (&h, &g)) in hints
                 .0
                 .iter()
                 .zip(guess.0.iter())
-                .zip(knowledge.placed.word.iter())
                 .enumerate()
                 .filter(|&(j, _)| j != i)
             {
-                if h == Hint::OutOfPlace
-                    || (h == Hint::Correct && !matches!(p, &PartialChar::Some(_)))
-                {
+                if h != Hint::Wrong {
                     if let Some(i) = known.get_mut(&g) {
                         *i = i.saturating_sub(1);
                     }
