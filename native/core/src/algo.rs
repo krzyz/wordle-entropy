@@ -5,7 +5,6 @@ use crate::structs::{
     knowledge::PartialChar,
     word::WordN,
 };
-use arrayvec::ArrayVec;
 use fxhash::FxHashMap;
 use itertools::izip;
 use serde::{Deserialize, Serialize};
@@ -16,33 +15,19 @@ where
     T: Serialize + Copy + Eq,
     for<'de2> T: Deserialize<'de2>,
 {
-    let mut left = ArrayVec::<_, N>::new();
-    get_hints_with_work_array(guess, correct, &mut left)
-}
-
-pub fn get_hints_with_work_array<T, const N: usize>(
-    guess: &WordN<T, N>,
-    correct: &WordN<T, N>,
-    left: &mut ArrayVec<T, N>,
-) -> HintsN<N>
-where
-    T: Serialize + Copy + Eq,
-    for<'de2> T: Deserialize<'de2>,
-{
     let mut hints = HintsN::<N>::wrong();
-    for (i, (g, c)) in guess.0.into_iter().zip(correct.0.into_iter()).enumerate() {
-        if g == c {
+    for i in 0..N {
+        if guess.0[i] == correct.0[i] {
             hints.0[i] = Hint::Correct
         } else {
-            left.push(c);
-        }
-    }
-
-    for l in left {
-        for i in 0..N {
-            if hints.0[i] == Hint::Wrong && *l == guess.0[i] {
-                hints.0[i] = Hint::OutOfPlace;
-                break;
+            for j in 0..N {
+                if hints.0[j] == Hint::Wrong
+                    && guess.0[j] != correct.0[j]
+                    && correct.0[i] == guess.0[j]
+                {
+                    hints.0[j] = Hint::OutOfPlace;
+                    break;
+                }
             }
         }
     }

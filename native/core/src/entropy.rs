@@ -1,4 +1,3 @@
-use arrayvec::ArrayVec;
 use ndarray::Array1;
 #[cfg(feature = "parallel")]
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -49,8 +48,7 @@ pub fn calculate_entropies<const N: usize>(
                 .iter()
                 .map(|&i| (&dictionary.words_bytes[i], &dictionary.probabilities[i]))
             {
-                let mut left = ArrayVec::<_, N>::new();
-                let hints = algo::get_hints_with_work_array(&guess_b, correct, &mut left);
+                let hints = algo::get_hints(&guess_b, correct);
                 guess_hints[hints.to_ind()] += *probability / prob_norm;
             }
 
