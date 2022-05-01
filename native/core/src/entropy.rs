@@ -1,4 +1,5 @@
 use ndarray::Array1;
+use rayon::iter::IndexedParallelIterator;
 #[cfg(feature = "parallel")]
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::cmp::Ordering::Equal;
@@ -36,7 +37,14 @@ pub fn calculate_entropies<const N: usize>(
     let guess_words_bytes = &dictionary.words_bytes;
 
     #[cfg(feature = "parallel")]
-    let guess_words_iter = guess_words_bytes.par_iter();
+    let guess_words_iter = {
+        let min_len = if possible_answers.len() > 1000 {
+            0
+        } else {
+            guess_words_bytes.len()
+        };
+        guess_words_bytes.par_iter().with_min_len(min_len)
+    };
 
     #[cfg(not(feature = "parallel"))]
     let guess_words_iter = guess_words_bytes.iter();
