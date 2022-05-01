@@ -150,7 +150,12 @@ pub fn view(props: &Props) -> Html {
                     <table class="centered">
                     {
                         if let Some(step) = step {
-                            if let Some(GuessStep { ref answers, .. }) = step.1.iter().last() {
+                            let guess_step = if let Some(selected_step) = *selected_step {
+                                step.1.iter().nth(selected_step)
+                            } else {
+                                step.1.iter().last()
+                            };
+                            if let Some(GuessStep { ref answers, .. }) = guess_step {
                                 let answers_opt_iter = answers.iter().map(|x| Some(x));
                                 let answers_opt_iter = if answers.len() > 10 {
                                     Either::Right(answers_opt_iter.clone().take(5).chain(iter::once(None)).chain(answers_opt_iter.rev().take(5).rev()))
