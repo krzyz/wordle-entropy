@@ -1,12 +1,11 @@
 use ndarray::Array1;
-use rayon::iter::IndexedParallelIterator;
 #[cfg(feature = "parallel")]
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::cmp::Ordering::Equal;
 
 use crate::{
-    algo,
     calibration::{bounded_log_c, Calibration},
+    hints_computed::HintsComputed,
     structs::{Dictionary, EntropiesData},
 };
 
@@ -29,35 +28,37 @@ pub fn entropy(arr: Array1<f64>) -> f64 {
 pub fn calculate_entropies<const N: usize>(
     dictionary: &Dictionary<N>,
     possible_answers: &[usize],
+    hints_computed: &HintsComputed,
 ) -> Vec<EntropiesData<N>> {
     let prob_norm: f64 = possible_answers
         .iter()
         .map(|&i| dictionary.probabilities[i])
         .sum();
-    let guess_words_bytes = &dictionary.words_bytes;
 
     #[cfg(feature = "parallel")]
     let guess_words_iter = {
         let min_len = if possible_answers.len() > 1000 {
             0
         } else {
-            guess_words_bytes.len()
+            dictionary.words.len()
         };
-        guess_words_bytes.par_iter().with_min_len(min_len)
+        (0..dictionary.words.len())
+            .into_par_iter()
+            .with_min_len(min_len)
     };
 
     #[cfg(not(feature = "parallel"))]
-    let guess_words_iter = guess_words_bytes.iter();
+    let guess_words_iter = (0..dictionary.words);
 
-    let entropies = guess_words_iter
-        .map(|guess_b| {
+    guess_words_iter
+        .map(&|i| {
+            assert!(i < hints_computed.size());
             let mut guess_hints = vec![0.; dictionary.hints.len()];
-            for (correct, probability) in possible_answers
-                .iter()
-                .map(|&i| (&dictionary.words_bytes[i], &dictionary.probabilities[i]))
-            {
-                let hints = algo::get_hints(&guess_b, correct);
-                guess_hints[hints.to_ind()] += *probability / prob_norm;
+            for &j in possible_answers.into_iter() {
+                assert!(j < hints_computed.size());
+                let probability = &dictionary.probabilities[j];
+                let hints = unsafe { hints_computed.get_hint(i, j) };
+                guess_hints[hints] += *probability / prob_norm;
             }
 
             let probs = Array1::<f64>::from_vec(guess_hints.clone());
@@ -65,9 +66,7 @@ pub fn calculate_entropies<const N: usize>(
 
             EntropiesData::new(entropy, guess_hints)
         })
-        .collect::<Vec<_>>();
-
-    entropies
+        .collect::<Vec<_>>()
 }
 
 pub fn entropies_scored<const N: usize>(

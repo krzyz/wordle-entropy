@@ -2,6 +2,7 @@ pub mod algo;
 pub mod calibration;
 pub mod data;
 pub mod entropy;
+mod hints_computed;
 pub mod solvers;
 pub mod structs;
 mod translator;

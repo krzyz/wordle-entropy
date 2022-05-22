@@ -10,6 +10,7 @@ use crate::{
     algo::{get_answers, get_hints_and_update},
     calibration::{bounded_log_c, Calibration},
     entropy::calculate_entropies,
+    hints_computed::HintsComputed,
     structs::{hints::HintsN, knowledge::KnowledgeN, word::WordN, Dictionary, EntropiesData},
     util::print_vec,
 };
@@ -30,6 +31,7 @@ pub fn expected_turns(x: f64, calibration: Calibration) -> f64 {
 pub fn solve<const N: usize>(
     initial_entropies: &Vec<EntropiesData<N>>,
     dictionary: &Dictionary<N>,
+    hints_computed: &HintsComputed,
     correct: &WordN<char, N>,
     print: bool,
 ) -> (Vec<WordN<char, N>>, Vec<HintsN<N>>, Vec<f64>, Vec<f64>) {
@@ -55,7 +57,7 @@ pub fn solve<const N: usize>(
         let entropies = if i == 0 {
             initial_entropies.clone()
         } else {
-            calculate_entropies(dictionary, &answers)
+            calculate_entropies(dictionary, &answers, &hints_computed)
         };
 
         let mut scores = entropies
@@ -142,7 +144,8 @@ pub fn solve_random<const N: usize>(dictionary: &Dictionary<N>, n: usize) -> Vec
     let correct_words = words.iter().choose_multiple(&mut rand::thread_rng(), n);
 
     let start = Instant::now();
-    let initial_entropies = calculate_entropies(dictionary, &answers);
+    let hints_computed = HintsComputed::initialize(dictionary);
+    let initial_entropies = calculate_entropies(dictionary, &answers, &hints_computed);
     let duration = start.elapsed();
     println!(
         "Initial entropies calculation took: {}ms",
@@ -154,8 +157,13 @@ pub fn solve_random<const N: usize>(dictionary: &Dictionary<N>, n: usize) -> Vec
 
     for correct in correct_words {
         println!("correct: {correct}");
-        let (guesses, hints, entropies, uncertainties) =
-            solve(&initial_entropies, dictionary, correct, false);
+        let (guesses, hints, entropies, uncertainties) = solve(
+            &initial_entropies,
+            dictionary,
+            &hints_computed,
+            correct,
+            false,
+        );
 
         print_vec(&guesses);
         print_vec(&hints);
