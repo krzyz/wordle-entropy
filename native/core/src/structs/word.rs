@@ -14,7 +14,7 @@ pub enum WordError {
 }
 
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, Hash)]
 #[serde(bound = "T: Serialize, for<'de2> T: Deserialize<'de2>")]
 pub struct WordN<T, const N: usize>(#[serde_as(as = "[_; N]")] pub [T; N])
 where

@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::{collections::HashSet, iter};
 
+use super::WordN;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PartialChar {
     None,
@@ -54,6 +56,7 @@ pub struct KnowledgeN<const N: usize> {
     pub known: FxHashMap<char, u8>,
     pub ruled_out: HashSet<char>,
     pub placed: PartialWord<N>,
+    pub guesses: Vec<WordN<char, N>>,
 }
 
 impl<const N: usize> KnowledgeN<N> {

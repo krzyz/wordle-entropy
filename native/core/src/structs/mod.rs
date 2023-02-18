@@ -2,6 +2,8 @@ pub mod hints;
 pub mod knowledge;
 pub mod word;
 
+use std::{collections::HashMap, sync::Arc};
+
 use crate::translator::Translator;
 pub use hints::HintsN;
 use serde::{Deserialize, Serialize};
@@ -45,3 +47,5 @@ impl<const N: usize> Dictionary<N> {
         }
     }
 }
+
+pub type EntropiesCacheN<const N: usize> = HashMap<Vec<WordN<char, N>>, Arc<Vec<EntropiesData<N>>>>;

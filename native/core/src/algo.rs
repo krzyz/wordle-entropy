@@ -8,7 +8,7 @@ use crate::structs::{
 use fxhash::FxHashMap;
 use itertools::izip;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::{collections::HashSet, iter};
 
 pub fn get_hints<T, const N: usize>(guess: &WordN<T, N>, correct: &WordN<T, N>) -> HintsN<N>
 where
@@ -90,10 +90,14 @@ pub fn update_knowledge<const N: usize>(
         known
     };
 
+    let mut guesses = knowledge.guesses;
+    guesses.extend(iter::once(*guess));
+
     let knowledge = KnowledgeN {
         known,
         ruled_out,
         placed,
+        guesses,
     };
 
     knowledge

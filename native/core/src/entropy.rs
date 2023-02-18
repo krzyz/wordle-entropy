@@ -1,7 +1,7 @@
 use ndarray::Array1;
 #[cfg(feature = "parallel")]
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-use std::{cmp::Ordering::Equal, time::Instant};
+use std::{cmp::Ordering::Equal, sync::Arc};
 
 use crate::{
     calibration::{bounded_log_c, Calibration},
@@ -29,8 +29,7 @@ pub fn calculate_entropies<const N: usize>(
     dictionary: &Dictionary<N>,
     possible_answers: &[usize],
     hints_computed: &HintsComputed,
-) -> Vec<EntropiesData<N>> {
-    let start = Instant::now();
+) -> Arc<Vec<EntropiesData<N>>> {
     let prob_norm: f64 = possible_answers
         .iter()
         .map(|&i| dictionary.probabilities[i])
@@ -38,16 +37,11 @@ pub fn calculate_entropies<const N: usize>(
 
     #[cfg(feature = "parallel")]
     let guess_words_iter = {
-        // parallelization has much more overhead running in web worker
-        #[cfg(target_arch = "wasm32")]
-        let min_len = if possible_answers.len() > 1000 {
+        let min_len = if possible_answers.len() > 100 {
             0
         } else {
             dictionary.words.len()
         };
-
-        #[cfg(not(target_arch = "wasm32"))]
-        let min_len = 0;
 
         (0..dictionary.words.len())
             .into_par_iter()
@@ -75,15 +69,7 @@ pub fn calculate_entropies<const N: usize>(
         })
         .collect::<Vec<_>>();
 
-    let duration = start.elapsed();
-    println!(
-        "Calculate entropies took: {}ms for {} possible answers and {} words",
-        duration.as_millis(),
-        possible_answers.len(),
-        dictionary.words.len()
-    );
-
-    res
+    Arc::new(res)
 }
 
 pub fn entropies_scored<const N: usize>(

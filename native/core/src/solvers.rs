@@ -11,7 +11,7 @@ use crate::{
     calibration::{bounded_log_c, Calibration},
     entropy::calculate_entropies,
     hints_computed::HintsComputed,
-    structs::{hints::HintsN, knowledge::KnowledgeN, word::WordN, Dictionary, EntropiesData},
+    structs::{hints::HintsN, knowledge::KnowledgeN, word::WordN, Dictionary, EntropiesCacheN},
     util::print_vec,
 };
 
@@ -29,10 +29,10 @@ pub fn expected_turns(x: f64, calibration: Calibration) -> f64 {
 }
 
 pub fn solve<const N: usize>(
-    initial_entropies: &Vec<EntropiesData<N>>,
     dictionary: &Dictionary<N>,
     hints_computed: &HintsComputed,
     correct: &WordN<char, N>,
+    entropies_cache: &mut EntropiesCacheN<N>,
     print: bool,
 ) -> (Vec<WordN<char, N>>, Vec<HintsN<N>>, Vec<f64>, Vec<f64>) {
     let words = &dictionary.words;
@@ -46,7 +46,7 @@ pub fn solve<const N: usize>(
     let mut uncertainty = full_information;
     let mut prob_norm: f64 = answers.iter().map(|&i| dictionary.probabilities[i]).sum();
 
-    for i in 0.. {
+    for _ in 0.. {
         uncertainties.push(uncertainty);
         if answers.len() == 1 {
             total_information.push(total_information.last().copied().unwrap_or_default());
@@ -54,14 +54,12 @@ pub fn solve<const N: usize>(
             all_hints.push(HintsN::<N>::correct());
             break;
         }
-        let entropies = if i == 0 {
-            initial_entropies.clone()
-        } else {
-            calculate_entropies(dictionary, &answers, &hints_computed)
-        };
+        let entropies = entropies_cache
+            .entry(knowledge.guesses.clone())
+            .or_insert_with(|| calculate_entropies(dictionary, &answers, &hints_computed));
 
         let mut scores = entropies
-            .into_iter()
+            .iter()
             .enumerate()
             .map(|(i, entropies_data)| {
                 let prob = if answers.contains(&i) {
@@ -138,14 +136,16 @@ pub fn solve<const N: usize>(
     (guesses, all_hints, total_information, uncertainties)
 }
 
-pub fn solve_random<const N: usize>(dictionary: &Dictionary<N>, n: usize) -> Vec<(f64, i32)> {
+pub fn solve_random<const N: usize>(
+    dictionary: &Dictionary<N>,
+    n: usize,
+    entropies_cache: &mut EntropiesCacheN<N>,
+) -> Vec<(f64, i32)> {
     let words = &dictionary.words;
-    let answers = (0..words.len()).collect::<Vec<_>>();
     let correct_words = words.iter().choose_multiple(&mut rand::thread_rng(), n);
 
     let start = Instant::now();
     let hints_computed = HintsComputed::initialize(dictionary);
-    let initial_entropies = calculate_entropies(dictionary, &answers, &hints_computed);
     let duration = start.elapsed();
     println!(
         "Initial entropies calculation took: {}ms",
@@ -155,18 +155,10 @@ pub fn solve_random<const N: usize>(dictionary: &Dictionary<N>, n: usize) -> Vec
     let mut turns = vec![];
     let mut unc_data = vec![];
 
-    let mut total_time = 0;
-
-    for (i, correct) in correct_words.iter().enumerate() {
-        let start = Instant::now();
+    for correct in correct_words {
         println!("correct: {correct}");
-        let (guesses, hints, entropies, uncertainties) = solve(
-            &initial_entropies,
-            dictionary,
-            &hints_computed,
-            correct,
-            false,
-        );
+        let (guesses, hints, entropies, uncertainties) =
+            solve(dictionary, &hints_computed, correct, entropies_cache, false);
 
         print_vec(&guesses);
         print_vec(&hints);
@@ -180,9 +172,6 @@ pub fn solve_random<const N: usize>(dictionary: &Dictionary<N>, n: usize) -> Vec
             .map(|(i, unc)| (*unc, (guesses.len() - i) as i32))
             .collect::<Vec<_>>();
         unc_data.extend(unc_points);
-        total_time += start.elapsed().as_millis();
-        let avg = total_time as f32 / (i as f32 + 1.0);
-        println!("Avg time : {avg}");
     }
 
     let turns = Array::from(turns);

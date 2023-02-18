@@ -9,13 +9,14 @@ use varpro::solvers::levmar::{LevMarProblemBuilder, LevMarSolver};
 use we_core::algo;
 use we_core::data;
 use we_core::solvers::solve_random;
-use we_core::structs::{knowledge::KnowledgeN, word::WordN};
+use we_core::structs::{knowledge::KnowledgeN, word::WordN, EntropiesCacheN};
 use wordle_entropy_core as we_core;
 
 const WORDS_LENGTH: usize = 5;
 
 type Word = WordN<char, WORDS_LENGTH>;
 type Knowledge = KnowledgeN<WORDS_LENGTH>;
+type EntropiesCache = EntropiesCacheN<WORDS_LENGTH>;
 
 // c * (x+1)^r log((x+1))
 pub fn log_f_s<S: Scalar + Float>(x: S, r: S, a: S, b: S) -> S {
@@ -87,7 +88,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dictionary = data::load_words::<_, WORDS_LENGTH>(words_path).unwrap();
     let words = &dictionary.words;
 
-    let unc_data = solve_random(&dictionary, 200)
+    let mut entropies_cache = EntropiesCache::new();
+
+    let unc_data = solve_random(&dictionary, 200, &mut entropies_cache)
         .into_iter()
         .map(|(x, y)| (num::clamp(x, 0., f64::MAX), y as f64))
         .collect::<Vec<_>>();
