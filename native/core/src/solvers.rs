@@ -155,7 +155,10 @@ pub fn solve_random<const N: usize>(dictionary: &Dictionary<N>, n: usize) -> Vec
     let mut turns = vec![];
     let mut unc_data = vec![];
 
-    for correct in correct_words {
+    let mut total_time = 0;
+
+    for (i, correct) in correct_words.iter().enumerate() {
+        let start = Instant::now();
         println!("correct: {correct}");
         let (guesses, hints, entropies, uncertainties) = solve(
             &initial_entropies,
@@ -177,6 +180,9 @@ pub fn solve_random<const N: usize>(dictionary: &Dictionary<N>, n: usize) -> Vec
             .map(|(i, unc)| (*unc, (guesses.len() - i) as i32))
             .collect::<Vec<_>>();
         unc_data.extend(unc_points);
+        total_time += start.elapsed().as_millis();
+        let avg = total_time as f32 / (i as f32 + 1.0);
+        println!("Avg time : {avg}");
     }
 
     let turns = Array::from(turns);

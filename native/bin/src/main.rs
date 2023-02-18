@@ -91,7 +91,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .into_iter()
         .map(|(x, y)| (num::clamp(x, 0., f64::MAX), y as f64))
         .collect::<Vec<_>>();
-    println!("uncertaintes points: {unc_data:?}");
+    // println!("uncertaintes points: {unc_data:?}");
 
     let (a, b, r) = fit(unc_data.clone());
     println!("{r}, {a}, {b}");
