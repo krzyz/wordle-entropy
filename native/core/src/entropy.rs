@@ -1,9 +1,12 @@
 use ndarray::Array1;
 #[cfg(feature = "parallel")]
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-use std::{cmp::Ordering::Equal, sync::Arc};
+use rayon::iter::{
+    IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
+};
+use std::cmp::Ordering::Equal;
 
 use crate::{
+    algo,
     calibration::{bounded_log_c, Calibration},
     hints_computed::HintsComputed,
     structs::{Dictionary, EntropiesData},
@@ -25,11 +28,11 @@ pub fn entropy(arr: Array1<f64>) -> f64 {
     -1. * (arr * arr_log).sum()
 }
 
-pub fn calculate_entropies<const N: usize>(
+pub fn calculate_entropies_with_hints<const N: usize>(
     dictionary: &Dictionary<N>,
     possible_answers: &[usize],
     hints_computed: &HintsComputed,
-) -> Arc<Vec<EntropiesData<N>>> {
+) -> Vec<EntropiesData> {
     let prob_norm: f64 = possible_answers
         .iter()
         .map(|&i| dictionary.probabilities[i])
@@ -51,7 +54,7 @@ pub fn calculate_entropies<const N: usize>(
     #[cfg(not(feature = "parallel"))]
     let guess_words_iter = (0..dictionary.words);
 
-    let res = guess_words_iter
+    guess_words_iter
         .map(&|i| {
             assert!(i < hints_computed.size());
             let mut guess_hints = vec![0.; dictionary.hints.len()];
@@ -67,18 +70,60 @@ pub fn calculate_entropies<const N: usize>(
 
             EntropiesData::new(entropy, guess_hints)
         })
+        .collect::<Vec<_>>()
+}
+
+pub fn calculate_entropies<const N: usize>(
+    dictionary: &Dictionary<N>,
+    possible_answers: &[usize],
+) -> Vec<EntropiesData> {
+    let prob_norm: f64 = possible_answers
+        .iter()
+        .map(|&i| dictionary.probabilities[i])
+        .sum();
+    let guess_words_bytes = &dictionary.words_bytes;
+
+    #[cfg(feature = "parallel")]
+    let guess_words_iter = {
+        let min_len = if possible_answers.len() > 1000 {
+            0
+        } else {
+            guess_words_bytes.len()
+        };
+        guess_words_bytes.par_iter().with_min_len(min_len)
+    };
+
+    #[cfg(not(feature = "parallel"))]
+    let guess_words_iter = guess_words_bytes.iter();
+
+    let entropies = guess_words_iter
+        .map(|guess_b| {
+            let mut guess_hints = vec![0.; dictionary.hints.len()];
+            for (correct, probability) in possible_answers
+                .iter()
+                .map(|&i| (&dictionary.words_bytes[i], &dictionary.probabilities[i]))
+            {
+                let hints = algo::get_hints(&guess_b, correct);
+                guess_hints[hints.to_ind()] += *probability / prob_norm;
+            }
+
+            let probs = Array1::<f64>::from_vec(guess_hints.clone());
+            let entropy = entropy(probs);
+
+            EntropiesData::new(entropy, guess_hints)
+        })
         .collect::<Vec<_>>();
 
-    Arc::new(res)
+    entropies
 }
 
 pub fn entropies_scored<const N: usize>(
     dictionary: &Dictionary<N>,
     answers: &[usize],
-    entropies: Vec<EntropiesData<N>>,
+    entropies: Vec<EntropiesData>,
     uncertainty: Option<f64>,
     calibration: Option<Calibration>,
-) -> Vec<(usize, EntropiesData<N>, f64)> {
+) -> Vec<(usize, EntropiesData, f64)> {
     let uncertainty = match uncertainty {
         Some(uncertainty) => uncertainty,
         None => (dictionary.words.len() as f64).log2(),

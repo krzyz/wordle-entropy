@@ -10,12 +10,12 @@ use serde::{Deserialize, Serialize};
 pub use word::{WordError, WordN};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct EntropiesData<const N: usize> {
+pub struct EntropiesData {
     pub entropy: f64,
     pub probabilities: Vec<f64>,
 }
 
-impl<const N: usize> EntropiesData<N> {
+impl EntropiesData {
     pub fn new(entropy: f64, probabilities: Vec<f64>) -> Self {
         EntropiesData {
             entropy,
@@ -48,4 +48,4 @@ impl<const N: usize> Dictionary<N> {
     }
 }
 
-pub type EntropiesCacheN<const N: usize> = HashMap<Vec<WordN<char, N>>, Arc<Vec<EntropiesData<N>>>>;
+pub type EntropiesCacheN<const N: usize> = HashMap<Vec<WordN<char, N>>, Arc<Vec<EntropiesData>>>;

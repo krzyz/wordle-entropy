@@ -1,5 +1,3 @@
-#[cfg(feature = "parallel")]
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 
 use crate::{algo, structs::Dictionary};
@@ -28,16 +26,7 @@ impl HintsComputed {
     }
 
     pub fn initialize<const N: usize>(dictionary: &Dictionary<N>) -> Self {
-        #[cfg(feature = "parallel")]
-        let guess_words_iter = {
-            let min_len = dictionary.words.len();
-            (0..dictionary.words.len())
-                .into_par_iter()
-                .with_min_len(min_len)
-        };
-
-        #[cfg(not(feature = "parallel"))]
-        let guess_words_iter = (0..dictionary.words);
+        let guess_words_iter = 0..dictionary.words.len();
 
         let hints_matrix = guess_words_iter
             .map(&|i| {

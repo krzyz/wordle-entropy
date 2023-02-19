@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{rc::Rc, sync::Arc};
 
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
@@ -7,7 +7,7 @@ use wordle_entropy_core::{
     entropy::{calculate_entropies, entropies_scored},
 };
 
-use crate::{word_set::WordSet, EntropiesData, Knowledge};
+use crate::{word_set::WordSet, EntropiesCache, EntropiesData, Knowledge};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum SimulationInput {
@@ -69,6 +69,7 @@ impl SimulationData {
 
 #[derive(Default)]
 pub struct Simulation {
+    entropies_cache: EntropiesCache,
     state: Option<SimulationData>,
 }
 
@@ -167,11 +168,20 @@ impl Simulation {
             })
             .sum();
 
-        let entropies = calculate_entropies(&data.word_set.dictionary, &data.answers[..]);
+        let entropies = self
+            .entropies_cache
+            .entry(data.knowledge.guesses.clone())
+            .or_insert_with(|| {
+                Arc::new(calculate_entropies(
+                    &data.word_set.dictionary,
+                    &data.answers[..],
+                ))
+            });
+
         let scores = entropies_scored(
             &data.word_set.dictionary,
             &data.answers[..],
-            entropies,
+            (**entropies).clone(),
             Some(uncertainty),
             Some(data.word_set.calibration.get_calibration()),
         )

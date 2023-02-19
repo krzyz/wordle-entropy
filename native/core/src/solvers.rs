@@ -1,4 +1,4 @@
-use std::{cmp::Ordering::Equal, time::Instant};
+use std::{cmp::Ordering::Equal, sync::Arc, time::Instant};
 
 use nalgebra::Scalar;
 use ndarray::Array;
@@ -9,7 +9,7 @@ use rand::prelude::IteratorRandom;
 use crate::{
     algo::{get_answers, get_hints_and_update},
     calibration::{bounded_log_c, Calibration},
-    entropy::calculate_entropies,
+    entropy::calculate_entropies_with_hints,
     hints_computed::HintsComputed,
     structs::{hints::HintsN, knowledge::KnowledgeN, word::WordN, Dictionary, EntropiesCacheN},
     util::print_vec,
@@ -56,7 +56,13 @@ pub fn solve<const N: usize>(
         }
         let entropies = entropies_cache
             .entry(knowledge.guesses.clone())
-            .or_insert_with(|| calculate_entropies(dictionary, &answers, &hints_computed));
+            .or_insert_with(|| {
+                Arc::new(calculate_entropies_with_hints(
+                    dictionary,
+                    &answers,
+                    &hints_computed,
+                ))
+            });
 
         let mut scores = entropies
             .iter()

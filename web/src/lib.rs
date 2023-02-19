@@ -16,12 +16,14 @@ use js_sys::{global, Reflect};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 pub use wasm_bindgen_rayon::init_thread_pool;
+pub use wordle_entropy_core::hints_computed::HintsComputed;
+pub use wordle_entropy_core::structs::EntropiesData;
 
 const WORD_SIZE: usize = 5;
 pub type Word = wordle_entropy_core::structs::WordN<char, WORD_SIZE>;
 pub type Hints = wordle_entropy_core::structs::HintsN<WORD_SIZE>;
 pub type Dictionary = wordle_entropy_core::structs::Dictionary<WORD_SIZE>;
-pub type EntropiesData = wordle_entropy_core::structs::EntropiesData<WORD_SIZE>;
+pub type EntropiesCache = wordle_entropy_core::structs::EntropiesCacheN<WORD_SIZE>;
 pub type Knowledge = wordle_entropy_core::structs::knowledge::KnowledgeN<WORD_SIZE>;
 
 async fn init_threads() -> Result<JsValue, JsValue> {
