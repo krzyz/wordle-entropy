@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 wordle-entropy-core = { path = "../core", features = ["terminal"] }
-plotters = "0.3.1"
+plotters = "0.3.6"
 varpro = "0.3.0"
 nalgebra = "0.29"
 num-traits = "0.2.14"

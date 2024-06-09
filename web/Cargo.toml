@@ -14,7 +14,7 @@ strum = "0.24.0"
 strum_macros = "0.24.0"
 wee_alloc = { version = "0.4.4", optional = true }
 log = "0.4.14"
-wasm-bindgen-futures = "0.4.29"
+wasm-bindgen-futures = "0.4.41"
 gloo-worker = { git = "https://github.com/krzyz/gloo" }
 gloo-timers = { git = "https://github.com/krzyz/gloo" }
 gloo-file = { git = "https://github.com/krzyz/gloo" }
@@ -26,7 +26,7 @@ hsl = "0.1.1"
 num-complex = "0.4.0"
 rand = "0.8.5"
 rayon = "1.5.1"
-plotters = "0.3.1"
+plotters = "0.3.6"
 plotters-canvas = "0.3.0"
 yew-router = "0.16.0"
 gloo-storage = "0.2.0"
